@@ -2,12 +2,24 @@
 name = "system-alert"
 version = "0.1.0"
 edition = "2021"
+authors = ["Marky"]
+license = "MIT OR Apache-2.0"
+description = "A Rust library for monitoring and visualizing system alerts."
+homepage = "https://github.com/Marky-Shi/system_alert.git"
+repository = "https://github.com/Marky-Shi/system_alert.git"
+readme = "README.md"
+keywords = ["system-monitor", "macos", "apple-silicon", "terminal-ui", "monitoring", "performance", "visualization"]
+categories = [
+    "command-line-utilities",
+    "development-tools::profiling",
+    "visualization",
+]
 
 [dependencies]
-clap = "4.5.26"
+clap = "4.5.49"
 termion = "4.0.3"
-sysinfo = "0.33.1"
-libc = "0.2.169"
+sysinfo = "0.37.2"
+libc = "0.2.177"
 tui = { version = "0.19", default-features = false, features = ['termion'] }
 lazy_static = "1.4.0"
 regex = "1.11.1"
