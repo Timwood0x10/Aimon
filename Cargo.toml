@@ -8,7 +8,7 @@ description = "A Rust library for monitoring and visualizing system alerts."
 homepage = "https://github.com/Marky-Shi/system_alert.git"
 repository = "https://github.com/Marky-Shi/system_alert.git"
 readme = "README.md"
-keywords = ["system-monitor", "macos", "apple-silicon", "terminal-ui", "monitoring", "performance", "visualization"]
+keywords = ["system-monitor", "macos", "apple-silicon", "terminal-ui", "monitoring"]
 categories = [
     "command-line-utilities",
     "development-tools::profiling",
