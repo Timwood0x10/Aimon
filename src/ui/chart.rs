@@ -3,12 +3,11 @@
 
 use ratatui::{
     layout::Rect,
+    prelude::Modifier,
     style::{Color, Style},
     symbols,
     text::Span,
-    widgets::{
-        Axis, Block, Borders, Chart, Dataset, GraphType, Sparkline,
-    },
+    widgets::{Axis, Block, Borders, Chart, Dataset, GraphType, Sparkline},
     Frame,
 };
 
@@ -48,7 +47,7 @@ impl SparklineConfig {
             max: None,
         }
     }
-    
+
     pub fn with_max(title: &str, color: Color, max: u64) -> Self {
         Self {
             title: title.to_string(),
@@ -81,24 +80,47 @@ pub fn render_chart<T: Into<f64> + Copy>(
     let chart = Chart::new(datasets)
         .block(
             Block::default()
-                .title(format!(" {} ", config.title))
+                .title(format!(" ◈ {} ", config.title))
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(config.color))
-                .style(Style::default().bg(Color::Black)),
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .border_style(
+                    Style::default()
+                        .fg(config.color)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .style(Style::default().bg(Color::Rgb(30, 30, 30)).fg(config.color)),
         )
         .x_axis(
             Axis::default()
                 .bounds([0.0, data.len().max(1) as f64])
-                .style(Style::default().fg(Color::DarkGray)),
+                .style(
+                    Style::default()
+                        .fg(config.color)
+                        .add_modifier(Modifier::DIM),
+                ),
         )
         .y_axis(
             Axis::default()
                 .bounds([config.min, config.max])
                 .labels(vec![
-                    Span::styled(format!("{}", config.min), Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("{}", config.max), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{}", config.min),
+                        Style::default()
+                            .fg(config.color)
+                            .add_modifier(Modifier::DIM),
+                    ),
+                    Span::styled(
+                        format!("{}", config.max),
+                        Style::default()
+                            .fg(config.color)
+                            .add_modifier(Modifier::DIM),
+                    ),
                 ])
-                .style(Style::default().fg(Color::DarkGray)),
+                .style(
+                    Style::default()
+                        .fg(config.color)
+                        .add_modifier(Modifier::DIM),
+                ),
         );
 
     f.render_widget(chart, area);
@@ -112,17 +134,22 @@ pub fn render_sparkline<T: Into<u64> + Copy>(
     config: &SparklineConfig,
 ) {
     let sparkline_data: Vec<u64> = data.iter().map(|&v| v.into()).collect();
-    
+
     let sparkline = Sparkline::default()
         .block(
             Block::default()
-                .title(format!(" {} ", config.title))
+                .title(format!(" ◈ {} ", config.title))
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(config.color))
-                .style(Style::default().bg(Color::Black)),
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .border_style(
+                    Style::default()
+                        .fg(config.color)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .style(Style::default().bg(Color::Rgb(30, 30, 30)).fg(config.color)),
         )
         .data(&sparkline_data)
-        .style(Style::default().fg(config.color).bg(Color::Black));
-    
+        .style(Style::default().fg(config.color).bg(Color::Rgb(25, 25, 25)));
+
     f.render_widget(sparkline, area);
 }

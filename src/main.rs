@@ -1,12 +1,12 @@
 use system_alert::{
     cli::{check_root, handle_input, parse_args, InputEvent},
-    config::{Config, ProcessSortBy},
     collectors::DataCollector,
+    config::{Config, ProcessSortBy},
     history::HistoryData,
     notification::NotificationManager,
-    ui::UI,
-    ui::layouts::LayoutType,
     types::*,
+    ui::layouts::LayoutType,
+    ui::UI,
 };
 
 use log::{error, info, warn};
@@ -16,19 +16,19 @@ use tokio::time::interval;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    
+
     info!("Advanced System Monitor starting...");
-    
+
     // Check root privileges (but don't exit if not root, just warn)
     if let Err(e) = check_root().await {
         warn!("Running without root privileges: {}", e);
         warn!("Some features (like powermetrics) may not work properly.");
         warn!("For full functionality, run with: sudo cargo run");
     }
-    
+
     // Parse command line arguments
     let cli_args = parse_args();
-    
+
     // Load configuration
     let mut config = if let Some(config_file) = &cli_args.config_file {
         match Config::load_from_file(config_file) {
@@ -37,16 +37,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config
             }
             Err(e) => {
-                warn!("Failed to load config file {}: {}. Using defaults.", config_file, e);
+                warn!(
+                    "Failed to load config file {}: {}. Using defaults.",
+                    config_file, e
+                );
                 Config::default()
             }
         }
     } else {
         Config::default()
     };
-    
+
     // Apply CLI overrides
-    config.merge_with_cli(cli_args.refresh_rate, cli_args.minimal_mode, cli_args.theme.as_deref());
+    config.merge_with_cli(
+        cli_args.refresh_rate,
+        cli_args.minimal_mode,
+        cli_args.theme.as_deref(),
+    );
 
     // Handle headless/API modes before UI initialization
     if cli_args.json_output {
@@ -78,17 +85,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(ref format_str) = cli_args.stream_format {
-        match system_alert::api::OutputFormat::from_str(format_str) {
+        match system_alert::api::OutputFormat::parse_str(format_str) {
             Some(format) => {
                 let interval = cli_args.refresh_rate.unwrap_or(1);
-                if let Err(e) = system_alert::api::HeadlessExporter::export_stream(interval, format).await {
+                if let Err(e) =
+                    system_alert::api::HeadlessExporter::export_stream(interval, format).await
+                {
                     eprintln!("Stream error: {}", e);
                     std::process::exit(1);
                 }
                 return Ok(());
             }
             None => {
-                eprintln!("Unknown stream format: {}. Use json, csv, or prometheus.", format_str);
+                eprintln!(
+                    "Unknown stream format: {}. Use json, csv, or prometheus.",
+                    format_str
+                );
                 std::process::exit(1);
             }
         }
@@ -99,7 +111,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let collector = std::sync::Arc::new(tokio::sync::Mutex::new(
             system_alert::collectors::DataCollector::new_fast(),
         ));
-        if let Err(e) = system_alert::api::ApiServer::start("0.0.0.0", cli_args.port, collector.clone()).await {
+        if let Err(e) =
+            system_alert::api::ApiServer::start("0.0.0.0", cli_args.port, collector.clone()).await
+        {
             eprintln!("Failed to start API server: {}", e);
             std::process::exit(1);
         }
@@ -110,11 +124,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize UI first - immediate startup
     let mut ui = UI::with_theme(&config.display.theme)?;
-    info!("UI initialized with theme '{}' - starting data collection in background...", config.display.theme);
-    
+    info!(
+        "UI initialized with theme '{}' - starting data collection in background...",
+        config.display.theme
+    );
+
     // Show loading screen immediately
     ui.show_loading_screen()?;
-    
+
     // Initialize other components in background
     let mut data_collector = DataCollector::new_fast();
     let mut history = HistoryData::new(config.display.history_size);
@@ -122,16 +139,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.notifications.enabled,
         config.notifications.cooldown_seconds,
     );
-    
+
     // Set up input handling
     let mut input_receiver = handle_input().await;
-    
+
     // Set up refresh timer
     let mut refresh_interval = interval(Duration::from_secs(config.refresh_rate));
-    
+
     // Create initial empty data for immediate display
     let mut system_data = create_placeholder_data();
-    
+
     info!("System monitor initialized. Press '?' for help, 'q' to quit.");
 
     // Main event loop
@@ -280,7 +297,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_placeholder_data() -> SystemData {
     use std::time::Instant;
-    
+
     SystemData {
         system_info: SystemInfo {
             name: "macOS".to_string(),
@@ -289,12 +306,22 @@ fn create_placeholder_data() -> SystemData {
             host_name: "Loading...".to_string(),
             cpu_arch: "arm64".to_string(),
             cpu_brand: "Apple Silicon".to_string(),
+            cpu_core_count: 0,
+            e_core_count: 0,
+            p_core_count: 0,
+            gpu_core_count: 0,
+            chip_name: "Loading...".to_string(),
         },
         cpu_info: CpuInfo {
             core_usages: vec![0.0; 8], // 8 cores placeholder
             average_usage: 0.0,
             power_metrics: CPUMetrics::default(),
         },
+        gpu_info: GpuInfo::default(),
+        ane_info: AneInfo::default(),
+        dram_info: DramInfo::default(),
+        thunderbolt_info: ThunderboltInfo::default(),
+        disk_io_info: DiskIoInfo::default(),
         memory_info: MemoryInfo {
             total_memory: 0,
             used_memory: 0,
@@ -310,6 +337,7 @@ fn create_placeholder_data() -> SystemData {
         thermal_info: ThermalInfo::default(),
         performance_metrics: PerformanceMetrics::default(),
         system_health: SystemHealthInfo::default(),
+        terminal_info: TerminalInfo::default(),
         timestamp: Instant::now(),
     }
 }

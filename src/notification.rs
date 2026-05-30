@@ -27,7 +27,7 @@ impl Notification {
             timestamp: Instant::now(),
         }
     }
-    
+
     pub async fn send(&self) -> Result<(), Box<dyn std::error::Error>> {
         let subtitle = match self.level {
             AlertLevel::Info => "Information",
@@ -43,13 +43,13 @@ impl Notification {
             r#"display notification "{}" with title "{}" subtitle "{}""#,
             safe_message, safe_title, subtitle
         );
-        
+
         tokio::process::Command::new("osascript")
             .arg("-e")
             .arg(script)
             .output()
             .await?;
-            
+
         Ok(())
     }
 }
@@ -81,28 +81,37 @@ impl NotificationManager {
         let mut notifications = Vec::new();
 
         // Check CPU usage
-        if let Some(notification) = self.check_cpu_threshold(data.cpu_info.average_usage, thresholds) {
+        if let Some(notification) =
+            self.check_cpu_threshold(data.cpu_info.average_usage, thresholds)
+        {
             if self.should_send_notification("cpu") {
                 notification.send().await?;
-                self.last_notifications.insert("cpu".to_string(), Instant::now());
+                self.last_notifications
+                    .insert("cpu".to_string(), Instant::now());
                 notifications.push(notification);
             }
         }
 
         // Check memory usage
-        if let Some(notification) = self.check_memory_threshold(data.memory_info.usage_percentage, thresholds) {
+        if let Some(notification) =
+            self.check_memory_threshold(data.memory_info.usage_percentage, thresholds)
+        {
             if self.should_send_notification("memory") {
                 notification.send().await?;
-                self.last_notifications.insert("memory".to_string(), Instant::now());
+                self.last_notifications
+                    .insert("memory".to_string(), Instant::now());
                 notifications.push(notification);
             }
         }
 
         // Check temperature
-        if let Some(notification) = self.check_temperature_threshold(&data.temperature_info, thresholds) {
+        if let Some(notification) =
+            self.check_temperature_threshold(&data.temperature_info, thresholds)
+        {
             if self.should_send_notification("temperature") {
                 notification.send().await?;
-                self.last_notifications.insert("temperature".to_string(), Instant::now());
+                self.last_notifications
+                    .insert("temperature".to_string(), Instant::now());
                 notifications.push(notification);
             }
         }
@@ -118,7 +127,11 @@ impl NotificationManager {
         }
     }
 
-    fn check_cpu_threshold(&self, cpu_usage: f32, thresholds: &ThresholdConfig) -> Option<Notification> {
+    fn check_cpu_threshold(
+        &self,
+        cpu_usage: f32,
+        thresholds: &ThresholdConfig,
+    ) -> Option<Notification> {
         if cpu_usage > thresholds.cpu_critical {
             Some(Notification::new(
                 "CPU Alert",
@@ -136,7 +149,11 @@ impl NotificationManager {
         }
     }
 
-    fn check_memory_threshold(&self, memory_percentage: u16, thresholds: &ThresholdConfig) -> Option<Notification> {
+    fn check_memory_threshold(
+        &self,
+        memory_percentage: u16,
+        thresholds: &ThresholdConfig,
+    ) -> Option<Notification> {
         if memory_percentage > thresholds.memory_critical {
             Some(Notification::new(
                 "Memory Alert",
@@ -154,18 +171,28 @@ impl NotificationManager {
         }
     }
 
-    fn check_temperature_threshold(&self, temperatures: &[crate::types::TemperatureInfo], thresholds: &ThresholdConfig) -> Option<Notification> {
+    fn check_temperature_threshold(
+        &self,
+        temperatures: &[crate::types::TemperatureInfo],
+        thresholds: &ThresholdConfig,
+    ) -> Option<Notification> {
         for temp_info in temperatures {
             if temp_info.temperature > thresholds.temperature_critical {
                 return Some(Notification::new(
                     "Temperature Alert",
-                    &format!("{} temperature is critically high: {:.1}°C", temp_info.label, temp_info.temperature),
+                    &format!(
+                        "{} temperature is critically high: {:.1}°C",
+                        temp_info.label, temp_info.temperature
+                    ),
                     AlertLevel::Critical,
                 ));
             } else if temp_info.temperature > thresholds.temperature_warning {
                 return Some(Notification::new(
                     "Temperature Alert",
-                    &format!("{} temperature is high: {:.1}°C", temp_info.label, temp_info.temperature),
+                    &format!(
+                        "{} temperature is high: {:.1}°C",
+                        temp_info.label, temp_info.temperature
+                    ),
                     AlertLevel::Warning,
                 ));
             }
@@ -372,13 +399,11 @@ mod tests {
         let manager = create_notification_manager();
         let thresholds = create_test_thresholds();
 
-        let temperatures = vec![
-            TemperatureInfo {
-                label: "CPU".to_string(),
-                temperature: 50.0,
-                critical_temperature: 100.0,
-            },
-        ];
+        let temperatures = vec![TemperatureInfo {
+            label: "CPU".to_string(),
+            temperature: 50.0,
+            critical_temperature: 100.0,
+        }];
 
         let result = manager.check_temperature_threshold(&temperatures, &thresholds);
         assert!(result.is_none());
@@ -389,13 +414,11 @@ mod tests {
         let manager = create_notification_manager();
         let thresholds = create_test_thresholds();
 
-        let temperatures = vec![
-            TemperatureInfo {
-                label: "CPU".to_string(),
-                temperature: 71.0,
-                critical_temperature: 100.0,
-            },
-        ];
+        let temperatures = vec![TemperatureInfo {
+            label: "CPU".to_string(),
+            temperature: 71.0,
+            critical_temperature: 100.0,
+        }];
 
         let result = manager.check_temperature_threshold(&temperatures, &thresholds);
         assert!(result.is_some());
@@ -411,13 +434,11 @@ mod tests {
         let manager = create_notification_manager();
         let thresholds = create_test_thresholds();
 
-        let temperatures = vec![
-            TemperatureInfo {
-                label: "CPU".to_string(),
-                temperature: 86.0,
-                critical_temperature: 100.0,
-            },
-        ];
+        let temperatures = vec![TemperatureInfo {
+            label: "CPU".to_string(),
+            temperature: 86.0,
+            critical_temperature: 100.0,
+        }];
 
         let result = manager.check_temperature_threshold(&temperatures, &thresholds);
         assert!(result.is_some());
@@ -469,7 +490,9 @@ mod tests {
         let mut manager = create_notification_manager();
 
         // Set a recent notification
-        manager.last_notifications.insert("cpu".to_string(), Instant::now());
+        manager
+            .last_notifications
+            .insert("cpu".to_string(), Instant::now());
 
         // Should not send within cooldown
         assert!(!manager.should_send_notification("cpu"));
@@ -488,8 +511,8 @@ mod tests {
 
     #[test]
     fn test_notification_manager_disabled_returns_empty() {
-        let mut manager = NotificationManager::new(false, 30);
-        let thresholds = create_test_thresholds();
+        let _manager = NotificationManager::new(false, 30);
+        let _thresholds = create_test_thresholds();
 
         // Create test data - need to construct SystemData
         // Since we can't easily create SystemData, we'll test the disabled check indirectly
@@ -519,14 +542,14 @@ mod tests {
         assert!(mem_notification.message.contains("80%"));
 
         // Test temperature notification message format
-        let temperatures = vec![
-            TemperatureInfo {
-                label: "CPU".to_string(),
-                temperature: 75.0,
-                critical_temperature: 100.0,
-            },
-        ];
-        let temp_notification = manager.check_temperature_threshold(&temperatures, &thresholds).unwrap();
+        let temperatures = vec![TemperatureInfo {
+            label: "CPU".to_string(),
+            temperature: 75.0,
+            critical_temperature: 100.0,
+        }];
+        let temp_notification = manager
+            .check_temperature_threshold(&temperatures, &thresholds)
+            .unwrap();
         assert!(temp_notification.message.contains("75.0"));
         assert!(temp_notification.message.contains("CPU"));
     }

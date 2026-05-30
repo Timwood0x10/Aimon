@@ -7,7 +7,7 @@ use crate::types::*;
 pub async fn collect_system_health() -> SystemHealthInfo {
     // Get real system health data
     let mut health_info = SystemHealthInfo::default();
-    
+
     // Get real uptime
     if let Ok(output) = tokio::process::Command::new("sysctl")
         .arg("-n")
@@ -28,7 +28,7 @@ pub async fn collect_system_health() -> SystemHealthInfo {
             }
         }
     }
-    
+
     // Get real load averages
     if let Ok(output) = tokio::process::Command::new("sysctl")
         .arg("-n")
@@ -45,7 +45,7 @@ pub async fn collect_system_health() -> SystemHealthInfo {
                 .split_whitespace()
                 .filter_map(|s| s.parse().ok())
                 .collect();
-            
+
             if loads.len() >= 3 {
                 health_info.system_load_1min = loads[0];
                 health_info.system_load_5min = loads[1];
@@ -53,9 +53,12 @@ pub async fn collect_system_health() -> SystemHealthInfo {
             }
         }
     }
-    
+
     // Calculate power quality score based on load and other factors
-    let avg_load = (health_info.system_load_1min + health_info.system_load_5min + health_info.system_load_15min) / 3.0;
+    let avg_load = (health_info.system_load_1min
+        + health_info.system_load_5min
+        + health_info.system_load_15min)
+        / 3.0;
     health_info.power_quality_score = if avg_load < 1.0 {
         95
     } else if avg_load < 2.0 {
@@ -65,9 +68,9 @@ pub async fn collect_system_health() -> SystemHealthInfo {
     } else {
         65
     };
-    
+
     // Estimate sleep/wake efficiency (simplified)
     health_info.sleep_wake_efficiency = if avg_load < 1.5 { 95.0 } else { 85.0 };
-    
+
     health_info
 }

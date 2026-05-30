@@ -11,14 +11,14 @@ lazy_static::lazy_static! {
     // pmset patterns
     static ref PMSET_PERCENTAGE: Regex = Regex::new(r"(\d+)%").unwrap();
     static ref PMSET_TIME: Regex = Regex::new(r"(\d+):(\d+) remaining").unwrap();
-    
+
     // ioreg patterns
     static ref IOREG_CURRENT_CAPACITY: Regex = Regex::new(r#""AppleRawCurrentCapacity"\s*=\s*(\d+)"#).unwrap();
     static ref IOREG_DESIGN_CAPACITY: Regex = Regex::new(r#""DesignCapacity"\s*=\s*(\d+)"#).unwrap();
     static ref IOREG_CYCLE_COUNT: Regex = Regex::new(r#""CycleCount"\s*=\s*(\d+)"#).unwrap();
     static ref IOREG_ALT_CURRENT: Regex = Regex::new(r#""CurrentCapacity"\s*=\s*(\d+)"#).unwrap();
     static ref IOREG_ALT_DESIGN: Regex = Regex::new(r#""MaxCapacity"\s*=\s*(\d+)"#).unwrap();
-    
+
     // system_profiler patterns
     static ref PROFILER_MAX_CAPACITY: Regex = Regex::new(r"Maximum Capacity:\s*(\d+)%").unwrap();
     static ref PROFILER_CYCLE_COUNT: Regex = Regex::new(r"Cycle Count:\s*(\d+)").unwrap();
@@ -71,7 +71,11 @@ impl FastBatteryCollector {
                 });
                 info
             }
-            Err(_) => self.cache.as_ref().map(|c| c.data.clone()).unwrap_or_default(),
+            Err(_) => self
+                .cache
+                .as_ref()
+                .map(|c| c.data.clone())
+                .unwrap_or_default(),
         }
     }
 
@@ -98,13 +102,13 @@ impl FastBatteryCollector {
         if let Ok(capacity) = self.get_ioreg_data().await {
             info.current_capacity = capacity.current_capacity;
             info.design_capacity = capacity.design_capacity;
-            
+
             if info.cycle_count == 0 {
                 info.cycle_count = capacity.cycle_count;
             }
-            
+
             if info.health_percentage == 0.0 && capacity.design_capacity > 0 {
-                info.health_percentage = 
+                info.health_percentage =
                     (capacity.current_capacity as f32 / capacity.design_capacity as f32) * 100.0;
             }
         }
@@ -116,7 +120,10 @@ impl FastBatteryCollector {
     async fn get_pmset_data(&self) -> Result<BatteryInfo, Box<dyn std::error::Error>> {
         let output = timeout(
             Duration::from_secs(1),
-            tokio::process::Command::new("pmset").arg("-g").arg("batt").output(),
+            tokio::process::Command::new("pmset")
+                .arg("-g")
+                .arg("batt")
+                .output(),
         )
         .await??;
 

@@ -1,9 +1,7 @@
 //! Layout management for the UI
 //! Handles the arrangement of UI components
 
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 /// Create the main layout structure for full mode
 pub fn create_full_layout(area: Rect) -> Vec<Rect> {
@@ -13,7 +11,8 @@ pub fn create_full_layout(area: Rect) -> Vec<Rect> {
             Constraint::Length(3),  // Header
             Constraint::Length(12), // Top stats
             Constraint::Length(14), // Charts
-            Constraint::Min(0),    // Bottom stats
+            Constraint::Min(1),     // Bottom stats
+            Constraint::Length(1),  // Status bar
         ])
         .split(area)
         .to_vec()
@@ -47,10 +46,11 @@ pub fn create_bottom_stats_layout(area: Rect) -> Vec<Rect> {
     Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(30),
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-            Constraint::Percentage(20),
+            Constraint::Percentage(25), // Processes
+            Constraint::Percentage(20), // Network
+            Constraint::Percentage(20), // Thermal
+            Constraint::Percentage(15), // Network Sparkline
+            Constraint::Percentage(20), // Terminals (NEW!)
         ])
         .split(area)
         .to_vec()

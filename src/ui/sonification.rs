@@ -10,16 +10,16 @@ use ratatui::{
     Frame,
 };
 
-use crate::types::SystemData;
 use super::theme::Theme;
+use crate::types::SystemData;
 
 /// State for the sonification display
 #[derive(Debug, Clone)]
 pub struct SonificationState {
-    pub pitch: f32,    // 0.0 - 1.0, mapped from CPU usage
-    pub volume: f32,   // 0.0 - 1.0, mapped from memory usage
-    pub beat: f32,     // 0.0 - 1.0, mapped from network activity
-    pub tone: f32,     // 0.0 - 1.0, mapped from temperature
+    pub pitch: f32,  // 0.0 - 1.0, mapped from CPU usage
+    pub volume: f32, // 0.0 - 1.0, mapped from memory usage
+    pub beat: f32,   // 0.0 - 1.0, mapped from network activity
+    pub tone: f32,   // 0.0 - 1.0, mapped from temperature
 }
 
 impl Default for SonificationState {
@@ -40,7 +40,9 @@ impl SonificationState {
         let volume = (data.memory_info.usage_percentage as f32 / 100.0).clamp(0.0, 1.0);
 
         // Network beat: normalize total throughput
-        let total_net: u64 = data.network_info.iter()
+        let total_net: u64 = data
+            .network_info
+            .iter()
             .map(|n| n.bytes_received + n.bytes_transmitted)
             .sum();
         // Use log-scale for network to avoid extreme values dominating
@@ -52,14 +54,23 @@ impl SonificationState {
 
         // Temperature tone: average temp normalized to 0-100 range
         let tone = if !data.temperature_info.is_empty() {
-            let avg: f32 = data.temperature_info.iter().map(|t| t.temperature).sum::<f32>()
+            let avg: f32 = data
+                .temperature_info
+                .iter()
+                .map(|t| t.temperature)
+                .sum::<f32>()
                 / data.temperature_info.len() as f32;
             (avg / 100.0).clamp(0.0, 1.0)
         } else {
             0.0
         };
 
-        Self { pitch, volume, beat, tone }
+        Self {
+            pitch,
+            volume,
+            beat,
+            tone,
+        }
     }
 }
 
@@ -147,26 +158,17 @@ pub fn render(f: &mut Frame, area: Rect, data: &SystemData, _active: bool, theme
     let state = SonificationState::from_system_data(data);
     let bar_width = 16;
 
-    let mut lines: Vec<Line> = Vec::new();
-
-    // Description
-    lines.push(Line::from(Span::styled(
-        describe_sonification(data),
-        Style::default().fg(theme.fg),
-    )));
-    lines.push(Line::from(""));
-
-    // Pitch bar (CPU)
-    lines.push(render_bar("Pitch", state.pitch, theme.cpu_color, bar_width));
-
-    // Volume bar (Memory)
-    lines.push(render_bar("Volume", state.volume, theme.mem_color, bar_width));
-
-    // Beat bar (Network)
-    lines.push(render_bar("Beat", state.beat, theme.net_rx_color, bar_width));
-
-    // Tone bar (Temperature)
-    lines.push(render_bar("Tone", state.tone, theme.temp_color, bar_width));
+    let lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            describe_sonification(data),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(""),
+        render_bar("Pitch", state.pitch, theme.cpu_color, bar_width),
+        render_bar("Volume", state.volume, theme.mem_color, bar_width),
+        render_bar("Beat", state.beat, theme.net_rx_color, bar_width),
+        render_bar("Tone", state.tone, theme.temp_color, bar_width),
+    ];
 
     let block = Paragraph::new(lines).block(
         Block::default()
@@ -193,12 +195,22 @@ mod tests {
                 host_name: "test".into(),
                 cpu_arch: "arm64".into(),
                 cpu_brand: "Apple M1".into(),
+                cpu_core_count: 8,
+                e_core_count: 4,
+                p_core_count: 4,
+                gpu_core_count: 8,
+                chip_name: "Apple M1".into(),
             },
             cpu_info: CpuInfo {
                 core_usages: vec![50.0, 60.0, 70.0],
                 average_usage: 60.0,
                 power_metrics: CPUMetrics::default(),
             },
+            gpu_info: GpuInfo::default(),
+            ane_info: AneInfo::default(),
+            dram_info: DramInfo::default(),
+            thunderbolt_info: ThunderboltInfo::default(),
+            disk_io_info: DiskIoInfo::default(),
             memory_info: MemoryInfo {
                 total_memory: 16 * 1024 * 1024 * 1024,
                 used_memory: 8 * 1024 * 1024 * 1024,
@@ -214,19 +226,18 @@ mod tests {
                 packets_received: 100,
                 packets_transmitted: 50,
             }],
-            temperature_info: vec![
-                TemperatureInfo {
-                    label: "CPU".into(),
-                    temperature: 55.0,
-                    critical_temperature: 100.0,
-                },
-            ],
+            temperature_info: vec![TemperatureInfo {
+                label: "CPU".into(),
+                temperature: 55.0,
+                critical_temperature: 100.0,
+            }],
             process_info: vec![],
             battery_info: BatteryInfo::default(),
             thermal_info: ThermalInfo::default(),
             performance_metrics: PerformanceMetrics::default(),
             system_health: SystemHealthInfo::default(),
             timestamp: Instant::now(),
+            terminal_info: TerminalInfo::default(),
         }
     }
 

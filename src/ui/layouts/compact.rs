@@ -1,23 +1,20 @@
 //! Compact layout - dense single-screen overview
 //! Shows key metrics in a 2x3 grid for quick scanning
 
+use crate::history::HistoryData;
+use crate::types::SystemData;
+use crate::ui::components;
+use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     Frame,
 };
-use crate::types::SystemData;
-use crate::history::HistoryData;
-use crate::ui::components;
-use crate::ui::theme::Theme;
 
 /// Create a 2x3 grid layout for compact view
 fn create_compact_grid(area: Rect) -> Vec<Rect> {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
     let top_cols = Layout::default()
@@ -38,7 +35,14 @@ fn create_compact_grid(area: Rect) -> Vec<Rect> {
         ])
         .split(rows[1]);
 
-    vec![top_cols[0], top_cols[1], top_cols[2], bottom_cols[0], bottom_cols[1], bottom_cols[2]]
+    vec![
+        top_cols[0],
+        top_cols[1],
+        top_cols[2],
+        bottom_cols[0],
+        bottom_cols[1],
+        bottom_cols[2],
+    ]
 }
 
 /// Draw the compact layout with key metrics in a grid

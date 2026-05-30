@@ -20,156 +20,207 @@ pub struct Theme {
 }
 
 impl Theme {
-    /// Cyberpunk neon - electric cyan, hot pink, acid green on pitch black
+    /// Cyberpunk neon - electric cyan, hot pink, acid green on deep navy
     pub fn cyberpunk() -> Self {
         Self {
-            bg: Color::Rgb(8, 8, 16),
-            fg: Color::Rgb(230, 230, 255),
+            bg: Color::Rgb(14, 14, 28),
+            fg: Color::Rgb(235, 235, 255),
             accent: Color::Rgb(0, 255, 255),
             cpu_color: Color::Rgb(0, 220, 255),
             mem_color: Color::Rgb(0, 255, 180),
-            temp_color: Color::Rgb(255, 60, 100),
-            net_rx_color: Color::Rgb(80, 180, 255),
-            net_tx_color: Color::Rgb(255, 120, 80),
+            temp_color: Color::Rgb(255, 70, 110),
+            net_rx_color: Color::Rgb(90, 190, 255),
+            net_tx_color: Color::Rgb(255, 130, 90),
             battery_color: Color::Rgb(0, 255, 120),
-            warning_color: Color::Rgb(255, 220, 0),
-            critical_color: Color::Rgb(255, 40, 60),
+            warning_color: Color::Rgb(255, 225, 40),
+            critical_color: Color::Rgb(255, 55, 70),
         }
     }
 
     /// Nord aurora - brightened with vivid aurora borealis colors
     pub fn nord() -> Self {
         Self {
-            bg: Color::Rgb(36, 42, 56),
-            fg: Color::Rgb(228, 234, 246),
-            accent: Color::Rgb(136, 192, 208),
-            cpu_color: Color::Rgb(130, 200, 240),
-            mem_color: Color::Rgb(160, 220, 140),
-            temp_color: Color::Rgb(230, 100, 120),
-            net_rx_color: Color::Rgb(100, 160, 230),
-            net_tx_color: Color::Rgb(230, 150, 120),
-            battery_color: Color::Rgb(160, 220, 140),
-            warning_color: Color::Rgb(240, 210, 140),
-            critical_color: Color::Rgb(230, 90, 110),
+            bg: Color::Rgb(40, 48, 64),
+            fg: Color::Rgb(232, 238, 248),
+            accent: Color::Rgb(140, 200, 220),
+            cpu_color: Color::Rgb(136, 210, 250),
+            mem_color: Color::Rgb(170, 230, 150),
+            temp_color: Color::Rgb(240, 110, 130),
+            net_rx_color: Color::Rgb(110, 170, 240),
+            net_tx_color: Color::Rgb(240, 160, 130),
+            battery_color: Color::Rgb(170, 230, 150),
+            warning_color: Color::Rgb(245, 215, 145),
+            critical_color: Color::Rgb(240, 100, 120),
         }
     }
 
     /// Dracula vivid - amplified neon purple, cyan, green
     pub fn dracula() -> Self {
         Self {
-            bg: Color::Rgb(32, 34, 48),
-            fg: Color::Rgb(250, 250, 245),
-            accent: Color::Rgb(200, 150, 255),
-            cpu_color: Color::Rgb(130, 240, 255),
-            mem_color: Color::Rgb(80, 255, 130),
-            temp_color: Color::Rgb(255, 80, 90),
-            net_rx_color: Color::Rgb(120, 130, 255),
-            net_tx_color: Color::Rgb(255, 120, 200),
-            battery_color: Color::Rgb(80, 255, 130),
-            warning_color: Color::Rgb(250, 255, 140),
-            critical_color: Color::Rgb(255, 70, 90),
+            bg: Color::Rgb(38, 40, 58),
+            fg: Color::Rgb(250, 250, 250),
+            accent: Color::Rgb(205, 160, 255),
+            cpu_color: Color::Rgb(140, 245, 255),
+            mem_color: Color::Rgb(90, 255, 145),
+            temp_color: Color::Rgb(255, 95, 105),
+            net_rx_color: Color::Rgb(135, 145, 255),
+            net_tx_color: Color::Rgb(255, 135, 210),
+            battery_color: Color::Rgb(90, 255, 145),
+            warning_color: Color::Rgb(255, 255, 150),
+            critical_color: Color::Rgb(255, 85, 100),
         }
     }
 
     /// Tokyo Night - deep indigo with vivid blue and magenta accents
     pub fn tokyo_night() -> Self {
         Self {
-            bg: Color::Rgb(18, 20, 32),
-            fg: Color::Rgb(200, 210, 255),
-            accent: Color::Rgb(120, 170, 255),
-            cpu_color: Color::Rgb(100, 210, 255),
-            mem_color: Color::Rgb(160, 220, 110),
-            temp_color: Color::Rgb(255, 100, 140),
-            net_rx_color: Color::Rgb(120, 160, 255),
-            net_tx_color: Color::Rgb(255, 160, 100),
-            battery_color: Color::Rgb(160, 220, 110),
-            warning_color: Color::Rgb(255, 200, 100),
-            critical_color: Color::Rgb(255, 100, 130),
+            bg: Color::Rgb(26, 28, 44),
+            fg: Color::Rgb(215, 222, 255),
+            accent: Color::Rgb(130, 180, 255),
+            cpu_color: Color::Rgb(110, 218, 255),
+            mem_color: Color::Rgb(170, 228, 120),
+            temp_color: Color::Rgb(255, 115, 150),
+            net_rx_color: Color::Rgb(130, 170, 255),
+            net_tx_color: Color::Rgb(255, 170, 110),
+            battery_color: Color::Rgb(170, 228, 120),
+            warning_color: Color::Rgb(255, 210, 110),
+            critical_color: Color::Rgb(255, 115, 140),
         }
     }
 
-    /// Monokai bright - vivid magenta, cyan, green on dark charcoal
+    /// Monokai bright - vivid magenta, cyan, green on warm charcoal
     pub fn monokai() -> Self {
         Self {
-            bg: Color::Rgb(30, 32, 28),
-            fg: Color::Rgb(250, 250, 245),
-            accent: Color::Rgb(255, 50, 140),
-            cpu_color: Color::Rgb(100, 230, 255),
-            mem_color: Color::Rgb(180, 255, 50),
-            temp_color: Color::Rgb(255, 150, 30),
-            net_rx_color: Color::Rgb(100, 230, 255),
-            net_tx_color: Color::Rgb(255, 160, 40),
-            battery_color: Color::Rgb(180, 255, 50),
-            warning_color: Color::Rgb(255, 240, 120),
-            critical_color: Color::Rgb(255, 50, 120),
+            bg: Color::Rgb(38, 40, 36),
+            fg: Color::Rgb(250, 250, 248),
+            accent: Color::Rgb(255, 70, 155),
+            cpu_color: Color::Rgb(110, 235, 255),
+            mem_color: Color::Rgb(190, 255, 60),
+            temp_color: Color::Rgb(255, 165, 45),
+            net_rx_color: Color::Rgb(110, 235, 255),
+            net_tx_color: Color::Rgb(255, 175, 55),
+            battery_color: Color::Rgb(190, 255, 60),
+            warning_color: Color::Rgb(255, 245, 135),
+            critical_color: Color::Rgb(255, 70, 135),
         }
     }
 
-    /// Solarized neon - classic solarized but with bumped-up saturation
+    /// Solarized neon - classic solarized but with bumped-up saturation and contrast
     pub fn solarized_dark() -> Self {
         Self {
-            bg: Color::Rgb(0, 36, 48),
-            fg: Color::Rgb(180, 200, 210),
-            accent: Color::Rgb(40, 170, 255),
-            cpu_color: Color::Rgb(50, 200, 200),
-            mem_color: Color::Rgb(160, 200, 0),
-            temp_color: Color::Rgb(240, 90, 30),
-            net_rx_color: Color::Rgb(40, 170, 255),
-            net_tx_color: Color::Rgb(240, 70, 160),
-            battery_color: Color::Rgb(160, 200, 0),
-            warning_color: Color::Rgb(220, 170, 0),
-            critical_color: Color::Rgb(250, 60, 50),
+            bg: Color::Rgb(7, 44, 58),
+            fg: Color::Rgb(210, 225, 230),
+            accent: Color::Rgb(55, 185, 255),
+            cpu_color: Color::Rgb(65, 210, 210),
+            mem_color: Color::Rgb(175, 210, 20),
+            temp_color: Color::Rgb(245, 105, 45),
+            net_rx_color: Color::Rgb(55, 185, 255),
+            net_tx_color: Color::Rgb(245, 85, 175),
+            battery_color: Color::Rgb(175, 210, 20),
+            warning_color: Color::Rgb(230, 185, 15),
+            critical_color: Color::Rgb(255, 75, 60),
         }
     }
 
     /// Gruvbox neon - retro orange, green, red, maxed-out vibrancy
     pub fn gruvbox() -> Self {
         Self {
-            bg: Color::Rgb(30, 30, 30),
-            fg: Color::Rgb(240, 230, 190),
-            accent: Color::Rgb(255, 120, 20),
-            cpu_color: Color::Rgb(80, 180, 180),
-            mem_color: Color::Rgb(180, 200, 40),
-            temp_color: Color::Rgb(250, 50, 40),
-            net_rx_color: Color::Rgb(80, 180, 180),
-            net_tx_color: Color::Rgb(255, 120, 20),
-            battery_color: Color::Rgb(180, 200, 40),
-            warning_color: Color::Rgb(255, 190, 40),
-            critical_color: Color::Rgb(250, 50, 40),
+            bg: Color::Rgb(38, 36, 32),
+            fg: Color::Rgb(245, 235, 200),
+            accent: Color::Rgb(255, 135, 30),
+            cpu_color: Color::Rgb(95, 195, 195),
+            mem_color: Color::Rgb(190, 215, 50),
+            temp_color: Color::Rgb(255, 65, 50),
+            net_rx_color: Color::Rgb(95, 195, 195),
+            net_tx_color: Color::Rgb(255, 135, 30),
+            battery_color: Color::Rgb(190, 215, 50),
+            warning_color: Color::Rgb(255, 200, 50),
+            critical_color: Color::Rgb(255, 65, 50),
         }
     }
 
     /// Catppuccin Mocha - pastel but with enough contrast to pop
     pub fn catppuccin() -> Self {
         Self {
-            bg: Color::Rgb(24, 24, 38),
-            fg: Color::Rgb(210, 220, 250),
-            accent: Color::Rgb(140, 190, 255),
-            cpu_color: Color::Rgb(120, 210, 250),
-            mem_color: Color::Rgb(170, 240, 170),
-            temp_color: Color::Rgb(250, 140, 170),
-            net_rx_color: Color::Rgb(120, 210, 250),
-            net_tx_color: Color::Rgb(255, 180, 140),
-            battery_color: Color::Rgb(170, 240, 170),
-            warning_color: Color::Rgb(255, 230, 180),
-            critical_color: Color::Rgb(250, 130, 160),
+            bg: Color::Rgb(30, 30, 48),
+            fg: Color::Rgb(218, 228, 255),
+            accent: Color::Rgb(150, 200, 255),
+            cpu_color: Color::Rgb(130, 218, 255),
+            mem_color: Color::Rgb(180, 245, 180),
+            temp_color: Color::Rgb(255, 150, 180),
+            net_rx_color: Color::Rgb(130, 218, 255),
+            net_tx_color: Color::Rgb(255, 190, 150),
+            battery_color: Color::Rgb(180, 245, 180),
+            warning_color: Color::Rgb(255, 235, 190),
+            critical_color: Color::Rgb(255, 145, 170),
         }
     }
 
     /// One Dark vivid - brightened Atom theme with neon touches
     pub fn one_dark() -> Self {
         Self {
-            bg: Color::Rgb(30, 34, 44),
-            fg: Color::Rgb(200, 210, 230),
-            accent: Color::Rgb(100, 190, 255),
-            cpu_color: Color::Rgb(90, 200, 220),
-            mem_color: Color::Rgb(160, 220, 130),
-            temp_color: Color::Rgb(250, 110, 120),
-            net_rx_color: Color::Rgb(100, 190, 255),
-            net_tx_color: Color::Rgb(240, 170, 100),
-            battery_color: Color::Rgb(160, 220, 130),
-            warning_color: Color::Rgb(250, 210, 130),
-            critical_color: Color::Rgb(250, 100, 110),
+            bg: Color::Rgb(36, 40, 54),
+            fg: Color::Rgb(215, 222, 240),
+            accent: Color::Rgb(115, 200, 255),
+            cpu_color: Color::Rgb(105, 210, 230),
+            mem_color: Color::Rgb(170, 228, 145),
+            temp_color: Color::Rgb(255, 125, 135),
+            net_rx_color: Color::Rgb(115, 200, 255),
+            net_tx_color: Color::Rgb(245, 180, 115),
+            battery_color: Color::Rgb(170, 228, 145),
+            warning_color: Color::Rgb(255, 218, 145),
+            critical_color: Color::Rgb(255, 115, 125),
+        }
+    }
+
+    /// Matrix Neon - deep green-black with layered green/cyan/yellow for depth
+    pub fn matrix_neon() -> Self {
+        Self {
+            bg: Color::Rgb(10, 18, 14),
+            fg: Color::Rgb(195, 255, 195),
+            accent: Color::Rgb(0, 255, 145),
+            cpu_color: Color::Rgb(70, 255, 150),
+            mem_color: Color::Rgb(20, 240, 180),
+            temp_color: Color::Rgb(255, 120, 115),
+            net_rx_color: Color::Rgb(90, 215, 205),
+            net_tx_color: Color::Rgb(255, 208, 75),
+            battery_color: Color::Rgb(20, 240, 180),
+            warning_color: Color::Rgb(255, 225, 70),
+            critical_color: Color::Rgb(255, 85, 100),
+        }
+    }
+
+    /// Mactop Green - inspired by mactop's clean green theme with professional look
+    pub fn mactop_green() -> Self {
+        Self {
+            bg: Color::Rgb(22, 28, 22),
+            fg: Color::Rgb(195, 250, 192),
+            accent: Color::Rgb(90, 195, 95),
+            cpu_color: Color::Rgb(145, 215, 148),
+            mem_color: Color::Rgb(120, 202, 125),
+            temp_color: Color::Rgb(245, 100, 95),
+            net_rx_color: Color::Rgb(95, 195, 185),
+            net_tx_color: Color::Rgb(255, 198, 90),
+            battery_color: Color::Rgb(120, 202, 125),
+            warning_color: Color::Rgb(255, 240, 70),
+            critical_color: Color::Rgb(240, 70, 65),
+        }
+    }
+
+    /// Gold Pro - warm dark background with golden/amber accents for a premium look
+    pub fn gold_pro() -> Self {
+        Self {
+            bg: Color::Rgb(26, 24, 20),
+            fg: Color::Rgb(238, 230, 210),
+            accent: Color::Rgb(225, 180, 45),
+            cpu_color: Color::Rgb(255, 205, 25),
+            mem_color: Color::Rgb(255, 172, 15),
+            temp_color: Color::Rgb(255, 105, 60),
+            net_rx_color: Color::Rgb(255, 222, 20),
+            net_tx_color: Color::Rgb(255, 155, 10),
+            battery_color: Color::Rgb(200, 155, 25),
+            warning_color: Color::Rgb(255, 205, 25),
+            critical_color: Color::Rgb(255, 82, 15),
         }
     }
 
@@ -185,6 +236,9 @@ impl Theme {
             "gruvbox",
             "catppuccin",
             "one_dark",
+            "matrix_neon",
+            "mactop_green",
+            "gold_pro",
         ]
     }
 
@@ -200,6 +254,9 @@ impl Theme {
             "gruvbox" => Some(Self::gruvbox()),
             "catppuccin" => Some(Self::catppuccin()),
             "one_dark" | "onedark" => Some(Self::one_dark()),
+            "matrix_neon" | "matrix" => Some(Self::matrix_neon()),
+            "mactop_green" | "mactop" => Some(Self::mactop_green()),
+            "gold_pro" | "gold" => Some(Self::gold_pro()),
             _ => None,
         }
     }
@@ -242,6 +299,12 @@ impl Theme {
             "catppuccin"
         } else if self.bg == Color::Rgb(30, 34, 44) {
             "one_dark"
+        } else if self.bg == Color::Rgb(5, 10, 8) {
+            "matrix_neon"
+        } else if self.bg == Color::Rgb(16, 20, 16) {
+            "mactop_green"
+        } else if self.bg == Color::Rgb(18, 18, 18) {
+            "gold_pro"
         } else {
             "unknown"
         }
@@ -309,7 +372,7 @@ mod tests {
     #[test]
     fn test_all_themes_count() {
         let themes = Theme::all_themes();
-        assert_eq!(themes.len(), 9);
+        assert_eq!(themes.len(), 12);
     }
 
     #[test]
@@ -336,7 +399,12 @@ mod tests {
 
         for (name, should_exist) in test_cases {
             let result = Theme::from_name(name);
-            assert_eq!(result.is_some(), should_exist, "Theme '{}' existence check failed", name);
+            assert_eq!(
+                result.is_some(),
+                should_exist,
+                "Theme '{}' existence check failed",
+                name
+            );
         }
     }
 
@@ -345,7 +413,12 @@ mod tests {
         let themes = Theme::all_themes();
         for theme_name in themes {
             let theme = Theme::from_name(theme_name).unwrap();
-            assert_eq!(theme.name(), theme_name, "Theme name roundtrip failed for '{}'", theme_name);
+            assert_eq!(
+                theme.name(),
+                theme_name,
+                "Theme name roundtrip failed for '{}'",
+                theme_name
+            );
         }
     }
 
@@ -368,8 +441,20 @@ mod tests {
         let red = Color::Rgb(255, 0, 0);
         let rotated_red = rotate_color(red, 120.0);
         if let Color::Rgb(r, g, b) = rotated_red {
-            assert!(g > 200, "Expected high green component, got r={}, g={}, b={}", r, g, b);
-            assert!(r < 10, "Expected low red component, got r={}, g={}, b={}", r, g, b);
+            assert!(
+                g > 200,
+                "Expected high green component, got r={}, g={}, b={}",
+                r,
+                g,
+                b
+            );
+            assert!(
+                r < 10,
+                "Expected low red component, got r={}, g={}, b={}",
+                r,
+                g,
+                b
+            );
         } else {
             panic!("Expected RGB color");
         }
@@ -394,7 +479,7 @@ mod tests {
             assert!(b >= 200, "CPU color blue should be bright");
         }
         // Critical should be clearly red
-        if let Color::Rgb(r, g, b) = theme.critical_color {
+        if let Color::Rgb(r, g, _b) = theme.critical_color {
             assert!(r >= 200, "Critical red should be dominant");
             assert!(g < 80, "Critical green should be low");
         }

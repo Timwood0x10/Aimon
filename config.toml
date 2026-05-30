@@ -17,8 +17,8 @@ show_network = true
 show_processes = true
 show_history = true
 history_size = 60
-# Available themes: cyberpunk, nord, dracula, tokyo_night, monokai, solarized_dark, gruvbox, catppuccin, one_dark
-theme = "cyberpunk"
+# Available themes: cyberpunk, nord, dracula, tokyo_night, monokai, solarized_dark, gruvbox, catppuccin, one_dark, matrix_neon, mactop_green, gold_pro
+theme = "gold_pro"
 
 [notifications]
 enabled = true

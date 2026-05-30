@@ -59,8 +59,8 @@ impl HistoryData {
 
         // Calculate network rate
         let now = Instant::now();
-        if let (Some(last_time), Some(last_rx), Some(last_tx)) = 
-            (self.last_update, self.last_network_rx, self.last_network_tx) 
+        if let (Some(last_time), Some(last_rx), Some(last_tx)) =
+            (self.last_update, self.last_network_rx, self.last_network_tx)
         {
             let elapsed = now.duration_since(last_time).as_secs_f64();
             if elapsed > 0.0 {
@@ -75,7 +75,11 @@ impl HistoryData {
         self.last_network_tx = Some(total_tx);
 
         if !data.temperature_info.is_empty() {
-            let avg_temp = data.temperature_info.iter().map(|t| t.temperature).sum::<f32>()
+            let avg_temp = data
+                .temperature_info
+                .iter()
+                .map(|t| t.temperature)
+                .sum::<f32>()
                 / data.temperature_info.len() as f32;
             Self::push_capped_static(temperature_history, max_size, avg_temp);
         }
@@ -89,8 +93,6 @@ impl HistoryData {
         deque.push_back(value);
     }
 
-    
-
     /// Calculate CPU usage trend (positive = increasing)
     pub fn get_cpu_trend(&self) -> Option<f32> {
         Self::calculate_trend(&self.cpu_history)
@@ -102,8 +104,21 @@ impl HistoryData {
             return None;
         }
         let count = self.memory_history.len().min(5) as f32;
-        let recent: f32 = self.memory_history.iter().rev().take(5).map(|&x| x as f32).sum::<f32>() / count;
-        let older: f32 = self.memory_history.iter().take(5).map(|&x| x as f32).sum::<f32>() / count;
+        let recent: f32 = self
+            .memory_history
+            .iter()
+            .rev()
+            .take(5)
+            .map(|&x| x as f32)
+            .sum::<f32>()
+            / count;
+        let older: f32 = self
+            .memory_history
+            .iter()
+            .take(5)
+            .map(|&x| x as f32)
+            .sum::<f32>()
+            / count;
         Some(recent - older)
     }
 

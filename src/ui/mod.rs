@@ -1,15 +1,15 @@
 //! UI module for the system monitor
 //! Handles all terminal rendering and user interface components
 
-pub mod theme;
+pub mod chart;
+pub mod chip_heatmap;
 pub mod components;
 pub mod layout;
-pub mod chart;
 pub mod layouts;
-pub mod chip_heatmap;
 pub mod party_mode;
 pub mod retro_effects;
 pub mod sonification;
+pub mod theme;
 
 use crate::config::{Config, LayoutSettings};
 use crate::history::HistoryData;
@@ -26,8 +26,8 @@ use ratatui::{
 use std::io;
 use termion::raw::IntoRawMode;
 
-use self::theme::Theme;
 use self::party_mode::PartyMode;
+use self::theme::Theme;
 
 /// Main UI structure
 pub struct UI {
@@ -71,7 +71,10 @@ impl UI {
     }
 
     /// Create UI with theme and initial layout
-    pub fn with_theme_and_layout(theme_name: &str, layout: LayoutType) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn with_theme_and_layout(
+        theme_name: &str,
+        layout: LayoutType,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut ui = Self::with_theme(theme_name)?;
         ui.current_layout = layout;
         Ok(ui)
@@ -96,7 +99,9 @@ impl UI {
             let loading_lines = vec![
                 Line::from(Span::styled(
                     "SYSTEM ALERT",
-                    Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
@@ -160,6 +165,9 @@ impl UI {
                 LayoutType::Full => {
                     layouts::full::draw(f, data, history, config, theme);
                 }
+                LayoutType::Advanced => {
+                    layouts::advanced::draw(f, data, history, config, theme);
+                }
                 LayoutType::Minimal => {
                     layouts::minimal::draw(f, data, theme);
                 }
@@ -178,6 +186,9 @@ impl UI {
                 LayoutType::SystemHealth => {
                     layouts::system_health::draw(f, data, history, theme);
                 }
+                LayoutType::Thermals => {
+                    layouts::thermals::draw(f, data, history, config, theme);
+                }
             }
 
             // Draw help overlay on top if active
@@ -192,7 +203,10 @@ impl UI {
     /// Switch to the next layout in sequence
     pub fn next_layout(&mut self) {
         let all = LayoutType::all();
-        let current_idx = all.iter().position(|&l| l == self.current_layout).unwrap_or(0);
+        let current_idx = all
+            .iter()
+            .position(|&l| l == self.current_layout)
+            .unwrap_or(0);
         let next_idx = (current_idx + 1) % all.len();
         self.current_layout = all[next_idx];
         log::info!("Layout changed to: {}", self.current_layout);
@@ -201,8 +215,15 @@ impl UI {
     /// Switch to the previous layout in sequence
     pub fn previous_layout(&mut self) {
         let all = LayoutType::all();
-        let current_idx = all.iter().position(|&l| l == self.current_layout).unwrap_or(0);
-        let prev_idx = if current_idx == 0 { all.len() - 1 } else { current_idx - 1 };
+        let current_idx = all
+            .iter()
+            .position(|&l| l == self.current_layout)
+            .unwrap_or(0);
+        let prev_idx = if current_idx == 0 {
+            all.len() - 1
+        } else {
+            current_idx - 1
+        };
         self.current_layout = all[prev_idx];
         log::info!("Layout changed to: {}", self.current_layout);
     }

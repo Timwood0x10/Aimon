@@ -1,11 +1,11 @@
 //! Minimal layout - just CPU and memory gauges
 //! A clean, distraction-free view of core metrics
 
-use ratatui::Frame;
 use crate::types::SystemData;
 use crate::ui::components;
 use crate::ui::layout;
 use crate::ui::theme::Theme;
+use ratatui::Frame;
 
 /// Draw the minimal layout with only CPU and memory
 pub fn draw(f: &mut Frame, data: &SystemData, theme: &Theme) {

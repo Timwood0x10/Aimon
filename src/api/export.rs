@@ -16,7 +16,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     /// Parse a format string (case-insensitive)
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "json" => Some(Self::Json),
             "csv" => Some(Self::Csv),
@@ -95,11 +95,7 @@ impl HeadlessExporter {
                     let data = exporter.collector.collect_all_data().await?;
                     let csv = format_csv(&data);
                     // Skip the header line, output only the data row
-                    Ok(csv
-                        .lines()
-                        .skip(1)
-                        .collect::<Vec<_>>()
-                        .join("\n"))
+                    Ok(csv.lines().skip(1).collect::<Vec<_>>().join("\n"))
                 }
                 OutputFormat::Prometheus => exporter.export_prometheus().await,
             };

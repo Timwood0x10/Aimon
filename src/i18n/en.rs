@@ -30,7 +30,10 @@ pub fn translations() -> Vec<((&'static str, &'static str), &'static str)> {
         // Loading screen
         (("en", "loading_quantum"), "Initializing quantum sensors..."),
         (("en", "loading_neural"), "Calibrating neural network..."),
-        (("en", "loading_particle"), "Loading particle accelerators..."),
+        (
+            ("en", "loading_particle"),
+            "Loading particle accelerators...",
+        ),
         (("en", "loading_abort"), "Press 'q' to abort"),
         // Achievements
         (("en", "achievements_title"), "Achievements Unlocked"),

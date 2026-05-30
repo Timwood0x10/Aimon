@@ -35,7 +35,10 @@ impl ApiServer {
                 .route("/health", web::get().to(health_handler))
                 .route("/api/metrics", web::get().to(metrics_json_handler))
                 .route("/api/metrics/csv", web::get().to(metrics_csv_handler))
-                .route("/api/metrics/compact", web::get().to(metrics_compact_handler))
+                .route(
+                    "/api/metrics/compact",
+                    web::get().to(metrics_compact_handler),
+                )
                 .route("/metrics", web::get().to(metrics_prometheus_handler))
         })
         .bind((bind_addr.as_str(), port))?;
@@ -67,8 +70,9 @@ async fn metrics_json_handler(state: web::Data<AppState>) -> HttpResponse {
                 .content_type("application/json")
                 .body(body)
         }
-        Err(e) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
@@ -78,12 +82,11 @@ async fn metrics_csv_handler(state: web::Data<AppState>) -> HttpResponse {
     match collector.collect_all_data().await {
         Ok(data) => {
             let body = format_csv(&data);
-            HttpResponse::Ok()
-                .content_type("text/csv")
-                .body(body)
+            HttpResponse::Ok().content_type("text/csv").body(body)
         }
-        Err(e) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
@@ -97,8 +100,9 @@ async fn metrics_compact_handler(state: web::Data<AppState>) -> HttpResponse {
                 .content_type("application/json")
                 .body(body)
         }
-        Err(e) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
@@ -112,7 +116,8 @@ async fn metrics_prometheus_handler(state: web::Data<AppState>) -> HttpResponse 
                 .content_type("text/plain; version=0.0.4; charset=utf-8")
                 .body(body)
         }
-        Err(e) => HttpResponse::InternalServerError()
-            .json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }

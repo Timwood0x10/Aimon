@@ -1,139 +1,167 @@
-//! GPU focus layout - GPU/ANE power and performance metrics
-//! Highlights GPU utilization, power draw, and CPU core activity
+//! GPU focus layout - Comprehensive GPU/ANE/DRAM performance monitoring
+//! Highlights GPU utilization, frequency, TFLOPs, ANE usage, DRAM bandwidth, and power breakdown
 
+use crate::history::HistoryData;
+use crate::types::SystemData;
+use crate::ui::components;
+use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph},
     Frame,
 };
-use crate::types::SystemData;
-use crate::history::HistoryData;
-use crate::ui::components;
-use crate::ui::theme::Theme;
 
 /// Create layout for GPU focus view
 fn create_gpu_focus_layout(area: Rect) -> Vec<Rect> {
     let main = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Length(8),  // GPU/ANE power stats
-            Constraint::Length(12), // CPU cores chart
-            Constraint::Min(0),    // Performance metrics
+            Constraint::Length(3),  // 0: Header
+            Constraint::Length(3),  // 1: CPU gauge
+            Constraint::Length(3),  // 2: GPU gauge
+            Constraint::Length(7),  // 3: GPU stats + ANE stats
+            Constraint::Length(7),  // 4: DRAM + Power breakdown
+            Constraint::Length(12), // 5: CPU cores bar chart
+            Constraint::Min(0),     // 6: Performance metrics / Disk IO
         ])
         .split(area);
 
-    let top_row = Layout::default()
+    let row3 = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
-        .split(main[1]);
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(main[3]);
 
-    vec![main[0], top_row[0], top_row[1], main[2], main[3]]
+    let row4 = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(main[4]);
+
+    vec![
+        main[0],   // Header
+        main[1],   // CPU gauge
+        main[2],   // GPU gauge
+        row3[0],   // GPU stats
+        row3[1],   // ANE stats
+        row4[0],   // DRAM stats
+        row4[1],   // Power breakdown
+        main[5],   // CPU cores
+        main[6],   // Performance / Disk IO
+    ]
 }
 
 /// Draw the GPU focus layout
-pub fn draw(f: &mut Frame, data: &SystemData, _history: &HistoryData, theme: &Theme) {
+pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
     let areas = create_gpu_focus_layout(f.size());
 
     // Header
     components::render_header(f, areas[0], data, theme);
 
-    // GPU Power
-    let power = &data.cpu_info.power_metrics;
-    let gpu_lines = vec![
-        Line::from(vec![
-            Span::styled("GPU Power: ", Style::default().fg(theme.fg)),
-            Span::styled(
-                format!("{:.1}W", power.gpu_w),
-                Style::default().fg(theme.warning_color).add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("Package:   ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{:.1}W", power.package_w), Style::default().fg(theme.accent)),
-        ]),
-        Line::from(vec![
-            Span::styled("CPU Power: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{:.1}W", power.cpu_w), Style::default().fg(theme.cpu_color)),
-        ]),
-    ];
+    // CPU gauge
+    let cpu_usage = data.cpu_info.average_usage;
+    let cpu_color = if cpu_usage > 90.0 {
+        theme.critical_color
+    } else if cpu_usage > 70.0 {
+        theme.warning_color
+    } else {
+        theme.cpu_color
+    };
+    let cpu_gauge = Gauge::default()
+        .block(
+            Block::default()
+                .title(format!(" ◈ CPU {:.1}% ", cpu_usage))
+                .borders(Borders::ALL)
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .border_style(Style::default().fg(cpu_color).add_modifier(Modifier::BOLD))
+                .style(Style::default().bg(theme.bg).fg(theme.fg)),
+        )
+        .gauge_style(
+            Style::default()
+                .fg(cpu_color)
+                .bg(ratatui::style::Color::Black)
+                .add_modifier(Modifier::BOLD),
+        )
+        .ratio(cpu_usage as f64 / 100.0);
+    f.render_widget(cpu_gauge, areas[1]);
 
-    let gpu_block = Paragraph::new(gpu_lines).block(
-        Block::default()
-            .title(" GPU POWER ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.warning_color)),
-    );
-    f.render_widget(gpu_block, areas[1]);
+    // GPU gauge
+    components::render_gpu_gauge(f, areas[2], data, theme);
 
-    // ANE Power
-    let ane_lines = vec![
-        Line::from(vec![
-            Span::styled("ANE Power: ", Style::default().fg(theme.fg)),
-            Span::styled(
-                format!("{:.1}W", power.ane_w),
-                Style::default().fg(theme.mem_color).add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("E-Cluster: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{}%", power.e_cluster_active), Style::default().fg(theme.fg)),
-        ]),
-        Line::from(vec![
-            Span::styled("P-Cluster: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{}%", power.p_cluster_active), Style::default().fg(theme.fg)),
-        ]),
-    ];
+    // GPU stats detail
+    components::render_gpu_stats(f, areas[3], data, theme);
 
-    let ane_block = Paragraph::new(ane_lines).block(
-        Block::default()
-            .title(" ANE / CLUSTERS ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.mem_color)),
-    );
-    f.render_widget(ane_block, areas[2]);
+    // ANE stats
+    components::render_ane_stats(f, areas[4], data, theme);
+
+    // DRAM stats
+    components::render_dram_stats(f, areas[5], data, theme);
+
+    // Power breakdown
+    components::render_power_breakdown(f, areas[6], data, theme);
 
     // CPU cores bar chart
-    components::render_cpu_cores_bar_chart(f, areas[3], data, theme);
+    components::render_cpu_cores_bar_chart(f, areas[7], data, theme);
+
+    // Performance metrics + Disk IO in bottom row
+    let bottom_split = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(areas[8]);
 
     // Performance metrics
+    let power = &data.cpu_info.power_metrics;
     let perf = &data.performance_metrics;
     let perf_lines = vec![
         Line::from(vec![
-            Span::styled("Workload:    ", Style::default().fg(theme.fg)),
+            Span::styled("  Workload:    ", Style::default().fg(theme.fg)),
             Span::styled(
                 perf.workload_type.clone(),
                 Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled("Perf/Watt:   ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{:.2}", perf.performance_per_watt), Style::default().fg(theme.fg)),
+            Span::styled("  Perf/Watt:   ", Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{:.2}", perf.performance_per_watt),
+                Style::default().fg(theme.fg),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("Freq Eff:    ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{:.2}", perf.frequency_efficiency), Style::default().fg(theme.fg)),
+            Span::styled("  Freq Eff:    ", Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{:.2}", perf.frequency_efficiency),
+                Style::default().fg(theme.fg),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("E-Core Freq: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{} MHz", power.e_cluster_freq_mhz), Style::default().fg(theme.fg)),
+            Span::styled("  E-Core Freq: ", Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{} MHz", power.e_cluster_freq_mhz),
+                Style::default().fg(theme.cpu_color),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("P-Core Freq: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{} MHz", power.p_cluster_freq_mhz), Style::default().fg(theme.fg)),
+            Span::styled("  P-Core Freq: ", Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{} MHz", power.p_cluster_freq_mhz),
+                Style::default().fg(theme.cpu_color),
+            ),
         ]),
     ];
 
-    let perf_block = Paragraph::new(perf_lines).block(
-        Block::default()
-            .title(" PERFORMANCE METRICS ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent)),
-    );
-    f.render_widget(perf_block, areas[4]);
+    let perf_block = Paragraph::new(perf_lines)
+        .style(Style::default().fg(theme.fg).bg(theme.bg))
+        .block(
+            Block::default()
+                .title(" ◈ PERFORMANCE ")
+                .borders(Borders::ALL)
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .border_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD))
+                .style(Style::default().bg(theme.bg)),
+        );
+    f.render_widget(perf_block, bottom_split[0]);
+
+    // Disk IO
+    components::render_disk_io_stats(f, bottom_split[1], data, theme);
 }

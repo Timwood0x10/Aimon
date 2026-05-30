@@ -1,6 +1,11 @@
 //! System health layout - uptime, load averages, temperatures, fans
 //! Comprehensive system wellness overview
 
+use crate::history::HistoryData;
+use crate::types::SystemData;
+use crate::ui::chart;
+use crate::ui::components;
+use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -8,11 +13,6 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crate::types::SystemData;
-use crate::history::HistoryData;
-use crate::ui::chart;
-use crate::ui::components;
-use crate::ui::theme::Theme;
 
 /// Create layout for system health view
 fn create_system_health_layout(area: Rect) -> Vec<Rect> {
@@ -22,27 +22,23 @@ fn create_system_health_layout(area: Rect) -> Vec<Rect> {
             Constraint::Length(3),  // Header
             Constraint::Length(10), // Uptime + Load averages
             Constraint::Length(8),  // Temperatures + Fans
-            Constraint::Min(0),    // Temperature history chart
+            Constraint::Min(0),     // Temperature history chart
         ])
         .split(area);
 
     let top_row = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main[1]);
 
     let mid_row = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main[2]);
 
-    vec![main[0], top_row[0], top_row[1], mid_row[0], mid_row[1], main[3]]
+    vec![
+        main[0], top_row[0], top_row[1], mid_row[0], mid_row[1], main[3],
+    ]
 }
 
 /// Format uptime seconds to human-readable string
@@ -74,32 +70,43 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Span::styled("Uptime: ", Style::default().fg(theme.fg)),
             Span::styled(
                 format_uptime(health.uptime_seconds),
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
             Span::styled("Sleep/Wake: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{:.0}%", health.sleep_wake_efficiency), Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{:.0}%", health.sleep_wake_efficiency),
+                Style::default().fg(theme.fg),
+            ),
         ]),
         Line::from(vec![
             Span::styled("Power Quality: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{}/100", health.power_quality_score), Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{}/100", health.power_quality_score),
+                Style::default().fg(theme.fg),
+            ),
         ]),
         Line::from(vec![
             Span::styled("Kernel: ", Style::default().fg(theme.fg)),
-            Span::styled(data.system_info.kernel_version.clone(), Style::default().fg(Color::Gray)),
+            Span::styled(
+                data.system_info.kernel_version.clone(),
+                Style::default().fg(Color::Gray),
+            ),
         ]),
     ];
 
     let uptime_block = Paragraph::new(uptime_lines)
         .style(Style::default().fg(theme.fg).bg(theme.bg))
         .block(
-        Block::default()
-            .title(" SYSTEM UPTIME ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent))
-            .style(Style::default().bg(theme.bg)),
-    );
+            Block::default()
+                .title(" SYSTEM UPTIME ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.accent))
+                .style(Style::default().bg(theme.bg)),
+        );
     f.render_widget(uptime_block, areas[1]);
 
     // Load averages
@@ -127,19 +134,22 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         ]),
         Line::from(vec![
             Span::styled("CPU Cores: ", Style::default().fg(theme.fg)),
-            Span::styled(format!("{}", data.cpu_info.core_usages.len()), Style::default().fg(theme.fg)),
+            Span::styled(
+                format!("{}", data.cpu_info.core_usages.len()),
+                Style::default().fg(theme.fg),
+            ),
         ]),
     ];
 
     let load_block = Paragraph::new(load_lines)
         .style(Style::default().fg(theme.fg).bg(theme.bg))
         .block(
-        Block::default()
-            .title(" LOAD AVERAGES ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.cpu_color))
-            .style(Style::default().bg(theme.bg)),
-    );
+            Block::default()
+                .title(" LOAD AVERAGES ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.cpu_color))
+                .style(Style::default().bg(theme.bg)),
+        );
     f.render_widget(load_block, areas[2]);
 
     // Temperatures
@@ -149,13 +159,20 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Span::styled("Thermal Pressure: ", Style::default().fg(theme.fg)),
             Span::styled(
                 format!("{}%", thermal.thermal_pressure),
-                Style::default().fg(components::thermal_pressure_color(thermal.thermal_pressure, theme)),
+                Style::default().fg(components::thermal_pressure_color(
+                    thermal.thermal_pressure,
+                    theme,
+                )),
             ),
         ]),
         Line::from(vec![
             Span::styled("Throttling: ", Style::default().fg(theme.fg)),
             Span::styled(
-                if thermal.thermal_throttling { "YES" } else { "NO" },
+                if thermal.thermal_throttling {
+                    "YES"
+                } else {
+                    "NO"
+                },
                 Style::default().fg(if thermal.thermal_throttling {
                     theme.critical_color
                 } else {
@@ -179,11 +196,12 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     let temp_block = Paragraph::new(temp_lines)
         .style(Style::default().fg(theme.fg).bg(theme.bg))
         .block(
-        Block::default()
-            .title(" TEMPERATURES ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.temp_color)),
-    );
+            Block::default()
+                .title(" TEMPERATURES ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.temp_color))
+                .style(Style::default().bg(theme.bg)),
+        );
     f.render_widget(temp_block, areas[3]);
 
     // Fan speeds
@@ -200,7 +218,10 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         .collect();
 
     let fan_block = Paragraph::new(if fan_lines.is_empty() {
-        vec![Line::from(Span::styled("No fan data", Style::default().fg(Color::Gray)))]
+        vec![Line::from(Span::styled(
+            "No fan data",
+            Style::default().fg(Color::Gray),
+        ))]
     } else {
         fan_lines
     })
@@ -209,7 +230,8 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         Block::default()
             .title(" FANS ")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.fg)),
+            .border_style(Style::default().fg(theme.fg))
+            .style(Style::default().bg(theme.bg)),
     );
     f.render_widget(fan_block, areas[4]);
 

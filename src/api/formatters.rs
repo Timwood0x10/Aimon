@@ -142,6 +142,11 @@ mod tests {
                 host_name: "test-host".to_string(),
                 cpu_arch: "arm64".to_string(),
                 cpu_brand: "Apple M1".to_string(),
+                cpu_core_count: 8,
+                e_core_count: 4,
+                p_core_count: 4,
+                gpu_core_count: 8,
+                chip_name: "Apple M1".to_string(),
             },
             cpu_info: CpuInfo {
                 core_usages: vec![10.0, 20.0, 30.0],
@@ -154,9 +159,15 @@ mod tests {
                     cpu_w: 1.5,
                     gpu_w: 0.5,
                     ane_w: 0.1,
+                    dram_w: 0.3,
                     package_w: 2.1,
                 },
             },
+            gpu_info: GpuInfo::default(),
+            ane_info: AneInfo::default(),
+            dram_info: DramInfo::default(),
+            thunderbolt_info: ThunderboltInfo::default(),
+            disk_io_info: DiskIoInfo::default(),
             memory_info: MemoryInfo {
                 total_memory: 16_000_000_000,
                 used_memory: 8_000_000_000,
@@ -193,6 +204,8 @@ mod tests {
                 temperature: 30.0,
             },
             thermal_info: ThermalInfo {
+                fans: vec![],
+                thermal_state: ThermalState::Nominal,
                 fan_speeds: vec![1200, 1300],
                 thermal_throttling: false,
                 heat_dissipation_rate: 5.0,
@@ -208,6 +221,7 @@ mod tests {
                 system_load_15min: 1.0,
             },
             timestamp: Instant::now(),
+            terminal_info: TerminalInfo::default(),
         }
     }
 
@@ -215,8 +229,8 @@ mod tests {
     fn test_format_json_output() {
         let data = create_test_data();
         let json_str = format_json(&data);
-        let parsed: serde_json::Value = serde_json::from_str(&json_str)
-            .expect("JSON output should be valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_str).expect("JSON output should be valid JSON");
         assert!(parsed.is_object());
         assert!(parsed.get("timestamp").is_some());
         assert!(parsed.get("cpu_info").is_some());
@@ -240,8 +254,8 @@ mod tests {
     fn test_format_compact_json() {
         let data = create_test_data();
         let json_str = format_compact_json(&data);
-        let parsed: serde_json::Value = serde_json::from_str(&json_str)
-            .expect("Compact JSON should be valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_str).expect("Compact JSON should be valid JSON");
         assert!(parsed.get("cpu").is_some());
         assert!(parsed.get("memory").is_some());
         assert!(parsed.get("battery").is_some());
@@ -254,8 +268,14 @@ mod tests {
     fn test_format_prometheus() {
         let data = create_test_data();
         let prom = format_prometheus(&data);
-        assert!(prom.contains("# HELP"), "Prometheus output should contain HELP lines");
-        assert!(prom.contains("# TYPE"), "Prometheus output should contain TYPE lines");
+        assert!(
+            prom.contains("# HELP"),
+            "Prometheus output should contain HELP lines"
+        );
+        assert!(
+            prom.contains("# TYPE"),
+            "Prometheus output should contain TYPE lines"
+        );
     }
 
     #[test]

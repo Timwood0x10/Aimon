@@ -1,16 +1,17 @@
 pub mod en;
 pub mod zh;
 
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
 
 /// Supported languages
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Language {
     #[serde(rename = "en")]
+    #[default]
     En,
     #[serde(rename = "zh")]
     Zh,
@@ -37,24 +38,10 @@ impl fmt::Display for Language {
     }
 }
 
-impl Default for Language {
-    fn default() -> Self {
-        Language::En
-    }
-}
-
 /// Language configuration holder
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LanguageConfig {
     pub current: Language,
-}
-
-impl Default for LanguageConfig {
-    fn default() -> Self {
-        Self {
-            current: Language::default(),
-        }
-    }
 }
 
 lazy_static! {
@@ -119,18 +106,22 @@ mod tests {
 
     #[test]
     fn test_tr_unknown_key_fallback() {
-        assert_eq!(tr(Language::En, "nonexistent_key_xyz"), "nonexistent_key_xyz");
-        assert_eq!(tr(Language::Zh, "nonexistent_key_xyz"), "nonexistent_key_xyz");
+        assert_eq!(
+            tr(Language::En, "nonexistent_key_xyz"),
+            "nonexistent_key_xyz"
+        );
+        assert_eq!(
+            tr(Language::Zh, "nonexistent_key_xyz"),
+            "nonexistent_key_xyz"
+        );
     }
 
     #[test]
     fn test_all_en_keys_exist_in_zh() {
         let en_translations = en::translations();
         let zh_translations = zh::translations();
-        let zh_keys: std::collections::HashSet<&str> = zh_translations
-            .iter()
-            .map(|((_, key), _)| *key)
-            .collect();
+        let zh_keys: std::collections::HashSet<&str> =
+            zh_translations.iter().map(|((_, key), _)| *key).collect();
 
         for ((_, key), _) in &en_translations {
             assert!(
@@ -145,10 +136,8 @@ mod tests {
     fn test_all_zh_keys_exist_in_en() {
         let en_translations = en::translations();
         let zh_translations = zh::translations();
-        let en_keys: std::collections::HashSet<&str> = en_translations
-            .iter()
-            .map(|((_, key), _)| *key)
-            .collect();
+        let en_keys: std::collections::HashSet<&str> =
+            en_translations.iter().map(|((_, key), _)| *key).collect();
 
         for ((_, key), _) in &zh_translations {
             assert!(

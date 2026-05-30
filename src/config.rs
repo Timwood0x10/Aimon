@@ -34,6 +34,9 @@ fn default_language() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub refresh_rate: u64,
+    /// Refresh interval in milliseconds (0 = use refresh_rate in seconds)
+    #[serde(default)]
+    pub refresh_rate_ms: u64,
     pub minimal_mode: bool,
     pub thresholds: ThresholdConfig,
     pub display: DisplayConfig,
@@ -77,6 +80,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             refresh_rate: 1,
+            refresh_rate_ms: 0,
             minimal_mode: false,
             thresholds: ThresholdConfig {
                 cpu_warning: 75.0,
@@ -121,7 +125,12 @@ impl Config {
     }
 
     /// Merge CLI arguments into config
-    pub fn merge_with_cli(&mut self, refresh_rate: Option<u64>, minimal_mode: bool, theme: Option<&str>) {
+    pub fn merge_with_cli(
+        &mut self,
+        refresh_rate: Option<u64>,
+        minimal_mode: bool,
+        theme: Option<&str>,
+    ) {
         if let Some(rate) = refresh_rate {
             self.refresh_rate = rate;
         }
@@ -233,15 +242,13 @@ impl LayoutSettings {
     pub fn load_runtime_state() -> Self {
         let path = Self::default_state_path();
         match fs::read_to_string(&path) {
-            Ok(content) => {
-                match toml::from_str::<LayoutSettings>(&content) {
-                    Ok(settings) => settings,
-                    Err(e) => {
-                        log::warn!("Failed to parse runtime state: {}. Using defaults.", e);
-                        LayoutSettings::default()
-                    }
+            Ok(content) => match toml::from_str::<LayoutSettings>(&content) {
+                Ok(settings) => settings,
+                Err(e) => {
+                    log::warn!("Failed to parse runtime state: {}. Using defaults.", e);
+                    LayoutSettings::default()
                 }
-            }
+            },
             Err(_) => LayoutSettings::default(),
         }
     }
@@ -429,15 +436,11 @@ mod tests {
             config.notifications.enabled,
             deserialized.notifications.enabled
         );
-        assert_eq!(
-            config.display.theme,
-            deserialized.display.theme
-        );
+        assert_eq!(config.display.theme, deserialized.display.theme);
     }
 
     #[test]
     fn test_config_save_and_load() {
-        use std::fs;
         use tempfile::NamedTempFile;
 
         let config = create_valid_config();
@@ -486,8 +489,6 @@ mod tests {
 
     #[test]
     fn test_config_save_load_runtime_state() {
-        use tempfile::NamedTempFile;
-
         let settings = LayoutSettings {
             current_layout: LayoutType::Compact,
             process_sort_by: ProcessSortBy::Memory,
@@ -513,7 +514,10 @@ mod tests {
 
         assert_eq!(settings.current_layout, deserialized.current_layout);
         assert_eq!(settings.process_sort_by, deserialized.process_sort_by);
-        assert_eq!(settings.process_scroll_offset, deserialized.process_scroll_offset);
+        assert_eq!(
+            settings.process_scroll_offset,
+            deserialized.process_scroll_offset
+        );
         assert_eq!(settings.party_mode, deserialized.party_mode);
     }
 }

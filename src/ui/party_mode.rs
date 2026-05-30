@@ -11,8 +11,9 @@ use ratatui::{
 use super::theme::Theme;
 
 /// Available party effects
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum PartyEffect {
+    #[default]
     ColorCycle,
     ScreenShake,
     Fireworks,
@@ -34,6 +35,7 @@ impl PartyEffect {
 }
 
 /// Party mode state manager
+#[derive(Default)]
 pub struct PartyMode {
     pub active: bool,
     pub frame_count: u64,
@@ -43,11 +45,7 @@ pub struct PartyMode {
 impl PartyMode {
     /// Create a new party mode instance (inactive by default)
     pub fn new() -> Self {
-        Self {
-            active: false,
-            frame_count: 0,
-            effect: PartyEffect::ColorCycle,
-        }
+        Self::default()
     }
 
     /// Toggle party mode on/off
@@ -112,8 +110,13 @@ impl PartyMode {
         let count = ((frame.wrapping_add(line_idx as u64)) % 4) as u16;
         let glitch_chars = ['!', '@', '#', '$', '%', '^', '&', '*', '~', '?', '>', '<'];
         for i in 0..count {
-            let pos = ((frame.wrapping_mul(19).wrapping_add(i as u64 * 7).wrapping_add(line_idx as u64)) % 40) as u16;
-            let ch_idx = ((frame.wrapping_add(i as u64).wrapping_add(line_idx as u64)) % glitch_chars.len() as u64) as usize;
+            let pos = ((frame
+                .wrapping_mul(19)
+                .wrapping_add(i as u64 * 7)
+                .wrapping_add(line_idx as u64))
+                % 40) as u16;
+            let ch_idx = ((frame.wrapping_add(i as u64).wrapping_add(line_idx as u64))
+                % glitch_chars.len() as u64) as usize;
             replacements.push((pos, glitch_chars[ch_idx]));
         }
         replacements
@@ -126,7 +129,10 @@ impl PartyMode {
         }
         let frame = self.frame_count;
         let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-        let idx = ((frame.wrapping_add(col as u64 * 7).wrapping_add(row as u64 * 13)) % chars.len() as u64) as usize;
+        let idx = ((frame
+            .wrapping_add(col as u64 * 7)
+            .wrapping_add(row as u64 * 13))
+            % chars.len() as u64) as usize;
         chars.chars().nth(idx).unwrap_or('A')
     }
 
@@ -189,15 +195,19 @@ impl PartyMode {
 
         // Add a few random glitch characters
         for i in 0..3u16 {
-            let x = ((frame.wrapping_mul(37).wrapping_add(i as u64 * 41)) % area.width as u64) as u16;
-            let y = ((frame.wrapping_mul(29).wrapping_add(i as u64 * 33)) % area.height as u64) as u16;
+            let x =
+                ((frame.wrapping_mul(37).wrapping_add(i as u64 * 41)) % area.width as u64) as u16;
+            let y =
+                ((frame.wrapping_mul(29).wrapping_add(i as u64 * 33)) % area.height as u64) as u16;
             let ch_idx = ((frame.wrapping_add(i as u64)) % glitch_chars.len() as u64) as usize;
 
             if x < area.width && y < area.height {
                 let glitch_area = Rect::new(area.x + x, area.y + y, 1, 1);
                 let glitch = ratatui::widgets::Paragraph::new(Line::from(Span::styled(
                     glitch_chars[ch_idx].to_string(),
-                    Style::default().fg(Color::Rgb(255, 0, 0)).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Rgb(255, 0, 0))
+                        .add_modifier(Modifier::BOLD),
                 )));
                 f.render_widget(glitch, glitch_area);
             }

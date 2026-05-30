@@ -3,8 +3,8 @@
 
 use crate::cli::get_powermetrics_output;
 use crate::types::*;
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
@@ -15,11 +15,7 @@ pub async fn collect_cpu_info(
     cached_cpu_metrics: &mut Option<CPUMetrics>,
     powermetrics_cache_duration: Duration,
 ) -> Result<CpuInfo, Box<dyn std::error::Error>> {
-    let cpu_usages: Vec<f32> = system
-        .cpus()
-        .iter()
-        .map(|cpu| cpu.cpu_usage())
-        .collect();
+    let cpu_usages: Vec<f32> = system.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
 
     let average_usage = if !cpu_usages.is_empty() {
         cpu_usages.iter().sum::<f32>() / cpu_usages.len() as f32
@@ -71,11 +67,12 @@ async fn fetch_fresh_powermetrics(
 /// Get fallback CPU metrics based on real CPU usage
 fn get_fallback_cpu_metrics(system: &System) -> CPUMetrics {
     // Use real CPU usage as basis for fallback metrics
-    let avg_usage = system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / system.cpus().len() as f32;
-    
+    let avg_usage =
+        system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / system.cpus().len() as f32;
+
     // Estimate based on actual CPU usage
     let estimated_power = (avg_usage / 100.0) * 15.0; // Scale with usage
-    
+
     CPUMetrics {
         e_cluster_active: (avg_usage * 0.6) as i32, // E-cores typically more active
         p_cluster_active: (avg_usage * 0.4) as i32, // P-cores less active
@@ -84,6 +81,7 @@ fn get_fallback_cpu_metrics(system: &System) -> CPUMetrics {
         ane_w: (estimated_power * 0.05) as f64,
         cpu_w: (estimated_power * 0.6) as f64,
         gpu_w: (estimated_power * 0.2) as f64,
+        dram_w: (estimated_power * 0.1) as f64,
         package_w: estimated_power as f64,
     }
 }
@@ -93,8 +91,10 @@ async fn parse_cpu_metrics(
     powermetrics_output: String,
 ) -> Result<CPUMetrics, Box<dyn std::error::Error>> {
     lazy_static! {
-        static ref ACTIVE_RESIDENCY_REGEX: Regex = Regex::new(r"CPU (\d+) active residency:\s+(\d+\.\d+)%").unwrap();
-        static ref FREQUENCY_REGEX: Regex = Regex::new(r"CPU\s+(\d+)\s+frequency:\s+(\d+)\s+MHz").unwrap();
+        static ref ACTIVE_RESIDENCY_REGEX: Regex =
+            Regex::new(r"CPU (\d+) active residency:\s+(\d+\.\d+)%").unwrap();
+        static ref FREQUENCY_REGEX: Regex =
+            Regex::new(r"CPU\s+(\d+)\s+frequency:\s+(\d+)\s+MHz").unwrap();
     }
 
     let lines: Vec<&str> = powermetrics_output.lines().collect();
@@ -111,7 +111,9 @@ async fn parse_cpu_metrics(
 
     for line in &lines {
         if let Some(caps) = ACTIVE_RESIDENCY_REGEX.captures(line) {
-            if let (Ok(core_id), Ok(active_residency)) = (caps[1].parse::<usize>(), caps[2].parse::<f64>()) {
+            if let (Ok(core_id), Ok(active_residency)) =
+                (caps[1].parse::<usize>(), caps[2].parse::<f64>())
+            {
                 if core_id <= 3 {
                     e_cluster_active_sum += active_residency;
                     e_cluster_count += 1;
@@ -123,7 +125,9 @@ async fn parse_cpu_metrics(
         }
 
         if let Some(caps) = FREQUENCY_REGEX.captures(line) {
-            if let (Ok(core_id), Ok(active_freq)) = (caps[1].parse::<usize>(), caps[2].parse::<f64>()) {
+            if let (Ok(core_id), Ok(active_freq)) =
+                (caps[1].parse::<usize>(), caps[2].parse::<f64>())
+            {
                 if core_id <= 3 {
                     e_cluster_freq_sum += active_freq;
                     e_cluster_freq_count += 1;
@@ -206,6 +210,7 @@ mod tests {
             cpu_w: 10.5,
             gpu_w: 5.2,
             ane_w: 1.1,
+            dram_w: 2.0,
             package_w: 16.8,
         };
 

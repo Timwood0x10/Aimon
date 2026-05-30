@@ -4,11 +4,17 @@ use termion::{
     event::{Event, Key},
     input::TermRead,
 };
-use tokio::{process::Command as tokio_comm, sync::mpsc as tokio_mpsc, time::{timeout, Duration}};
+use tokio::{
+    process::Command as tokio_comm,
+    sync::mpsc as tokio_mpsc,
+    time::{timeout, Duration},
+};
 
 #[derive(Debug)]
 pub struct CliArgs {
     pub refresh_rate: Option<u64>,
+    /// Refresh interval in milliseconds (overrides --refresh if set)
+    pub refresh_rate_ms: Option<u64>,
     pub minimal_mode: bool,
     pub config_file: Option<String>,
     pub theme: Option<String>,
@@ -32,6 +38,13 @@ pub fn parse_args() -> CliArgs {
                 .long("refresh")
                 .value_name("SECONDS")
                 .help("Set refresh rate in seconds (default: 1)")
+                .value_parser(clap::value_parser!(u64)),
+        )
+        .arg(
+            Arg::new("refresh-ms")
+                .long("refresh-ms")
+                .value_name("MILLIS")
+                .help("Set refresh rate in milliseconds, overrides --refresh (min: 100, e.g. 500 = 0.5s)")
                 .value_parser(clap::value_parser!(u64)),
         )
         .arg(
@@ -96,6 +109,7 @@ pub fn parse_args() -> CliArgs {
 
     CliArgs {
         refresh_rate: matches.get_one::<u64>("refresh").copied(),
+        refresh_rate_ms: matches.get_one::<u64>("refresh-ms").copied(),
         minimal_mode: matches.get_flag("minimal"),
         config_file: matches.get_one::<String>("config").cloned(),
         theme: matches.get_one::<String>("theme").cloned(),
@@ -122,7 +136,7 @@ pub async fn get_powermetrics_output() -> Result<String, Box<dyn std::error::Err
         .arg("--samplers")
         .arg("cpu_power,gpu_power")
         .output();
-    
+
     // Add 5 second timeout to prevent infinite waiting - this fixes potential deadlock
     match timeout(Duration::from_secs(5), powermetrics_future).await {
         Ok(Ok(output)) => {
@@ -133,7 +147,10 @@ pub async fn get_powermetrics_output() -> Result<String, Box<dyn std::error::Err
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         }
         Ok(Err(e)) => Err(format!("Failed to execute powermetrics: {}", e).into()),
-        Err(_) => Err("Powermetrics command timed out after 5 seconds - this may indicate a system issue".into()),
+        Err(_) => Err(
+            "Powermetrics command timed out after 5 seconds - this may indicate a system issue"
+                .into(),
+        ),
     }
 }
 
@@ -189,7 +206,9 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
                 Event::Key(Key::Char('q')) | Event::Key(Key::Ctrl('c')) => Some(InputEvent::Quit),
 
                 // Layout navigation (vim h/l and arrow keys)
-                Event::Key(Key::Char('h')) | Event::Key(Key::Left) => Some(InputEvent::PreviousLayout),
+                Event::Key(Key::Char('h')) | Event::Key(Key::Left) => {
+                    Some(InputEvent::PreviousLayout)
+                }
                 Event::Key(Key::Char('l')) | Event::Key(Key::Right) => Some(InputEvent::NextLayout),
 
                 // Scroll navigation (vim j/k and arrow keys)

@@ -52,36 +52,28 @@ impl PrometheusExporter {
             &mut lines,
             "system_power_watts",
             "Power consumption in watts",
-            &[
-                ("component", "cpu"),
-            ],
+            &[("component", "cpu")],
             data.cpu_info.power_metrics.cpu_w,
         );
         Self::add_gauge_with_labels(
             &mut lines,
             "system_power_watts",
             "Power consumption in watts",
-            &[
-                ("component", "gpu"),
-            ],
+            &[("component", "gpu")],
             data.cpu_info.power_metrics.gpu_w,
         );
         Self::add_gauge_with_labels(
             &mut lines,
             "system_power_watts",
             "Power consumption in watts",
-            &[
-                ("component", "ane"),
-            ],
+            &[("component", "ane")],
             data.cpu_info.power_metrics.ane_w,
         );
         Self::add_gauge_with_labels(
             &mut lines,
             "system_power_watts",
             "Power consumption in watts",
-            &[
-                ("component", "package"),
-            ],
+            &[("component", "package")],
             data.cpu_info.power_metrics.package_w,
         );
 

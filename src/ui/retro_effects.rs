@@ -22,7 +22,9 @@ pub fn render_scanlines(f: &mut Frame, area: Rect) {
             // Darkened scanline row
             lines.push(Line::from(Span::styled(
                 "\u{2592}".repeat(area.width as usize), // medium shade block
-                Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::Rgb(0, 0, 0)),
+                Style::default()
+                    .fg(Color::Rgb(0, 0, 0))
+                    .bg(Color::Rgb(0, 0, 0)),
             )));
         }
     }
@@ -41,14 +43,46 @@ struct PostEntry {
 /// Render a BIOS POST boot screen with component checks
 pub fn render_bios_post(f: &mut Frame, area: Rect, theme: &Theme) {
     let entries = vec![
-        PostEntry { name: "CPU", status: "Apple Silicon Detected", passed: true },
-        PostEntry { name: "MEMORY", status: "Unified Memory OK", passed: true },
-        PostEntry { name: "GPU", status: "Integrated GPU Active", passed: true },
-        PostEntry { name: "ANE", status: "Neural Engine Ready", passed: true },
-        PostEntry { name: "THERMAL", status: "Sensors Online", passed: true },
-        PostEntry { name: "STORAGE", status: "NVMe SSD OK", passed: true },
-        PostEntry { name: "NETWORK", status: "Interfaces Up", passed: true },
-        PostEntry { name: "DISPLAY", status: "Retina Display", passed: true },
+        PostEntry {
+            name: "CPU",
+            status: "Apple Silicon Detected",
+            passed: true,
+        },
+        PostEntry {
+            name: "MEMORY",
+            status: "Unified Memory OK",
+            passed: true,
+        },
+        PostEntry {
+            name: "GPU",
+            status: "Integrated GPU Active",
+            passed: true,
+        },
+        PostEntry {
+            name: "ANE",
+            status: "Neural Engine Ready",
+            passed: true,
+        },
+        PostEntry {
+            name: "THERMAL",
+            status: "Sensors Online",
+            passed: true,
+        },
+        PostEntry {
+            name: "STORAGE",
+            status: "NVMe SSD OK",
+            passed: true,
+        },
+        PostEntry {
+            name: "NETWORK",
+            status: "Interfaces Up",
+            passed: true,
+        },
+        PostEntry {
+            name: "DISPLAY",
+            status: "Retina Display",
+            passed: true,
+        },
     ];
 
     let mut lines: Vec<Line> = Vec::new();
@@ -56,7 +90,9 @@ pub fn render_bios_post(f: &mut Frame, area: Rect, theme: &Theme) {
     // Header
     lines.push(Line::from(Span::styled(
         "  SYSTEM ALERT BIOS v0.2.0",
-        Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(theme.accent)
+            .add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(Span::styled(
         "  ============================",
@@ -99,14 +135,12 @@ pub fn render_bios_post(f: &mut Frame, area: Rect, theme: &Theme) {
         Style::default().fg(Color::DarkGray),
     )));
 
-    let block = Paragraph::new(lines)
-        .alignment(Alignment::Left)
-        .block(
-            Block::default()
-                .title(" POST ")
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.accent)),
-        );
+    let block = Paragraph::new(lines).alignment(Alignment::Left).block(
+        Block::default()
+            .title(" POST ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.accent)),
+    );
 
     f.render_widget(block, area);
 }
@@ -123,7 +157,8 @@ pub fn render_matrix_rain(f: &mut Frame, area: Rect, _theme: &Theme, frame: u64)
         let mut spans: Vec<Span> = Vec::new();
         for col in 0..width {
             // Calculate character based on frame, column, and row
-            let idx = ((frame.wrapping_add(col as u64 * 7)
+            let idx = ((frame
+                .wrapping_add(col as u64 * 7)
                 .wrapping_add(row as u64 * 13))
                 % chars.len() as u64) as usize;
             let ch = chars.chars().nth(idx).unwrap_or('A');
@@ -206,10 +241,7 @@ pub fn render_glitch(f: &mut Frame, area: Rect, intensity: f32) {
                 Color::Rgb(255, 0, 255)
             };
 
-            lines.push(Line::from(Span::styled(
-                text,
-                Style::default().fg(color),
-            )));
+            lines.push(Line::from(Span::styled(text, Style::default().fg(color))));
         } else {
             lines.push(Line::from(Span::raw(" ".repeat(width))));
         }
@@ -221,8 +253,6 @@ pub fn render_glitch(f: &mut Frame, area: Rect, intensity: f32) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_bios_post_components() {
         // Verify the BIOS POST entries are well-formed
@@ -251,10 +281,17 @@ mod tests {
         for frame in 0..1000u64 {
             for col in 0..20u16 {
                 for row in 0..10u16 {
-                    let idx = ((frame.wrapping_add(col as u64 * 7)
+                    let idx = ((frame
+                        .wrapping_add(col as u64 * 7)
                         .wrapping_add(row as u64 * 13))
                         % chars.len() as u64) as usize;
-                    assert!(idx < chars.len(), "Index out of bounds at frame={}, col={}, row={}", frame, col, row);
+                    assert!(
+                        idx < chars.len(),
+                        "Index out of bounds at frame={}, col={}, row={}",
+                        frame,
+                        col,
+                        row
+                    );
                 }
             }
         }
@@ -266,7 +303,11 @@ mod tests {
         let test_values: Vec<f32> = vec![-0.5, 0.0, 0.3, 0.5, 1.0, 1.5, 2.0];
         for val in test_values {
             let clamped = val.clamp(0.0f32, 1.0f32);
-            assert!(clamped >= 0.0 && clamped <= 1.0, "Clamping failed for {}", val);
+            assert!(
+                (0.0..=1.0).contains(&clamped),
+                "Clamping failed for {}",
+                val
+            );
         }
 
         // Near-zero intensity should not produce glitch

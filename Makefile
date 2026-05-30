@@ -1,44 +1,89 @@
 # System Alert - Makefile
-# Automated build and release management
+# Automated build, format, check and release management
 
-.PHONY: help build test release clean install uninstall github-release
+.PHONY: help build release test clean install uninstall \
+        fmt check clippy lint dev quick all
 
 # Default target
 help:
 	@echo "🚀 System Alert - Build System"
 	@echo "=============================="
 	@echo ""
-	@echo "Available targets:"
+	@echo "Development:"
+	@echo "  fmt            - Format code with rustfmt"
+	@echo "  check          - Check code for errors (cargo check)"
+	@echo "  clippy         - Run clippy lints"
+	@echo "  lint           - Run full linting (fmt + check + clippy)"
+	@echo "  dev            - Quick dev cycle (fmt + check + build)"
+	@echo "  quick          - Super fast (fmt + check only)"
+	@echo ""
+	@echo "Building:"
 	@echo "  build          - Build debug version"
 	@echo "  release        - Build optimized release version"
 	@echo "  test           - Run tests"
 	@echo "  test-release   - Test the release binary"
+	@echo ""
+	@echo "Maintenance:"
 	@echo "  clean          - Clean build artifacts"
 	@echo "  install        - Install locally (requires sudo)"
 	@echo "  uninstall      - Uninstall from system"
 	@echo "  package        - Create distribution package"
 	@echo "  github-release - Create GitHub release (requires gh CLI)"
-	@echo "  all            - Build, test, and package"
+	@echo "  all            - Full pipeline (lint + test + release)"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make release        # Build optimized binary"
-	@echo "  make package        # Create distribution package"
-	@echo "  make github-release # Create GitHub release"
+	@echo "  make quick           # Fast check before commit"
+	@echo "  make dev             # Development cycle"
+	@echo "  make lint            # Full quality check"
+	@echo "  make release         # Build production binary"
+
+# Format code
+fmt:
+	@echo "🎨 Formatting code..."
+	cargo fmt --all
+	@echo "✅ Code formatted"
+
+# Check compilation (fast)
+check:
+	@echo "🔍 Checking compilation..."
+	cargo check 2>&1
+	@echo "✅ Compilation check passed"
+
+# Run clippy lints
+clippy:
+	@echo "🔎 Running clippy..."
+	cargo clippy --all-targets --all-features -- -D warnings 2>&1
+	@echo "✅ Clippy passed"
+
+# Full linting pipeline (MUST PASS)
+lint: fmt check clippy
+	@echo "✨ All linting passed!"
+
+# Quick development check (format + compile check)
+quick: fmt check
+	@echo "⚡ Quick check complete!"
+
+# Development cycle
+dev: fmt check build
+	@echo "🔄 Dev cycle complete!"
 
 # Build debug version
 build:
 	@echo "🔨 Building debug version..."
-	cargo build
+	cargo build 2>&1
+	@echo "✅ Debug build complete"
 
 # Build release version
 release:
 	@echo "🔨 Building release version..."
-	cargo build --release
+	cargo build --release 2>&1
+	@echo "✅ Release build complete"
 
 # Run tests
 test:
 	@echo "🧪 Running tests..."
-	cargo test
+	cargo test 2>&1
+	@echo "✅ Tests passed"
 
 # Test release binary
 test-release: release
@@ -50,6 +95,7 @@ clean:
 	@echo "🧹 Cleaning build artifacts..."
 	cargo clean
 	rm -rf release-builds dist
+	@echo "✅ Clean complete"
 
 # Install locally
 install: release
@@ -57,7 +103,7 @@ install: release
 	sudo cp target/release/system-alert /usr/local/bin/
 	sudo chmod +x /usr/local/bin/system-alert
 	@echo "✅ Installed to /usr/local/bin/system-alert"
-	@echo "🎯 Run with: sudo system-alert"
+	@echo "🎯 Run with: system-alert"
 
 # Uninstall from system
 uninstall:
@@ -75,25 +121,9 @@ github-release: package
 	@echo "🐙 Creating GitHub release..."
 	./scripts/github-release.sh
 
-# Build everything
-all: clean build test release test-release package
+# Full pipeline (lint + test + release)
+all: lint test release
 	@echo "✨ All tasks completed successfully!"
-
-# Development helpers
-dev-run: build
-	@echo "🚀 Running development version..."
-	sudo target/debug/system-alert
-
-release-run: release
-	@echo "🚀 Running release version..."
-	sudo target/release/system-alert
-
-# Check dependencies
-check-deps:
-	@echo "🔍 Checking dependencies..."
-	@command -v cargo >/dev/null 2>&1 || { echo "❌ Rust/Cargo not installed"; exit 1; }
-	@command -v git >/dev/null 2>&1 || { echo "❌ Git not installed"; exit 1; }
-	@echo "✅ Dependencies OK"
 
 # Show version info
 version:
@@ -102,10 +132,26 @@ version:
 	@echo "Git commit: $$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 	@echo "Build date: $$(date)"
 
-# Quick development cycle
-dev: clean build test
-	@echo "🔄 Development cycle complete"
+# Check dependencies
+check-deps:
+	@echo "🔍 Checking dependencies..."
+	@command -v cargo >/dev/null 2>&1 || { echo "❌ Rust/Cargo not installed"; exit 1; }
+	@command -v rustfmt >/dev/null 2>&1 || { echo "❌ rustfmt not installed"; exit 1; }
+	@command -v cargo-clippy >/dev/null 2>&1 || { echo "❌ clippy not installed"; exit 1; }
+	@command -v git >/dev/null 2>&1 || { echo "❌ Git not installed"; exit 1; }
+	@echo "✅ Dependencies OK"
 
-# Release cycle
-release-cycle: clean build test release test-release package
-	@echo "🚀 Release cycle complete"
+# Run application (debug)
+run: build
+	@echo "🚀 Running debug version..."
+	./target/debug/system-alert
+
+# Run application (release)
+run-release: release
+	@echo "🚀 Running release version..."
+	./target/release/system-alert
+
+# Watch mode (requires cargo-watch)
+watch:
+	@echo "👀 Watching for changes..."
+	cargo watch -x "quick"

@@ -4,7 +4,10 @@
 use crate::types::*;
 
 /// Collect performance metrics
-pub async fn collect_performance_metrics(cpu_info: &CpuInfo, total_power: f64) -> PerformanceMetrics {
+pub async fn collect_performance_metrics(
+    cpu_info: &CpuInfo,
+    total_power: f64,
+) -> PerformanceMetrics {
     let mut metrics = PerformanceMetrics::default();
 
     // Calculate instructions per watt (estimated)
@@ -19,7 +22,9 @@ pub async fn collect_performance_metrics(cpu_info: &CpuInfo, total_power: f64) -
     }
 
     // Calculate frequency efficiency
-    let avg_freq = (cpu_info.power_metrics.e_cluster_freq_mhz + cpu_info.power_metrics.p_cluster_freq_mhz) as f64 / 2.0;
+    let avg_freq = (cpu_info.power_metrics.e_cluster_freq_mhz
+        + cpu_info.power_metrics.p_cluster_freq_mhz) as f64
+        / 2.0;
     if avg_freq > 0.0 {
         metrics.frequency_efficiency = cpu_info.average_usage as f64 / avg_freq * 1000.0;
     }
