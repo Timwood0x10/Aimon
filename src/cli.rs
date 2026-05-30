@@ -11,6 +11,7 @@ pub struct CliArgs {
     pub refresh_rate: Option<u64>,
     pub minimal_mode: bool,
     pub config_file: Option<String>,
+    pub theme: Option<String>,
 }
 
 pub fn parse_args() -> CliArgs {
@@ -41,12 +42,20 @@ pub fn parse_args() -> CliArgs {
                 .value_name("FILE")
                 .help("Specify a custom configuration file"),
         )
+        .arg(
+            Arg::new("theme")
+                .short('t')
+                .long("theme")
+                .value_name("THEME")
+                .help("Set the UI theme (cyberpunk, nord, dracula, tokyo_night, monokai, solarized_dark, gruvbox, catppuccin, one_dark)"),
+        )
         .get_matches();
 
     CliArgs {
         refresh_rate: matches.get_one::<u64>("refresh").copied(),
         minimal_mode: matches.get_flag("minimal"),
         config_file: matches.get_one::<String>("config").cloned(),
+        theme: matches.get_one::<String>("theme").cloned(),
     }
 }
 
@@ -86,6 +95,7 @@ pub enum InputEvent {
     PreviousTab,
     ToggleNotifications,
     Refresh,
+    CycleTheme,
 }
 
 pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
@@ -94,27 +104,26 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
     tokio::spawn(async move {
         let stdin = std::io::stdin();
 
-        for event in stdin.events() {
-            if let Ok(event) = event {
-                let input_event = match event {
-                    Event::Key(Key::Char('q')) | Event::Key(Key::Ctrl('c')) => Some(InputEvent::Quit),
-                    Event::Key(Key::Right) | Event::Key(Key::Char('\t')) => Some(InputEvent::NextTab),
-                    Event::Key(Key::Left) | Event::Key(Key::BackTab) => Some(InputEvent::PreviousTab),
-                    Event::Key(Key::Char('n')) => Some(InputEvent::ToggleNotifications),
-                    Event::Key(Key::Char('r')) => Some(InputEvent::Refresh),
-                    _ => None,
-                };
+        for event in stdin.events().flatten() {
+            let input_event = match event {
+                Event::Key(Key::Char('q')) | Event::Key(Key::Ctrl('c')) => Some(InputEvent::Quit),
+                Event::Key(Key::Right) | Event::Key(Key::Char('\t')) => Some(InputEvent::NextTab),
+                Event::Key(Key::Left) | Event::Key(Key::BackTab) => Some(InputEvent::PreviousTab),
+                Event::Key(Key::Char('n')) => Some(InputEvent::ToggleNotifications),
+                Event::Key(Key::Char('r')) => Some(InputEvent::Refresh),
+                Event::Key(Key::Char('t')) => Some(InputEvent::CycleTheme),
+                _ => None,
+            };
 
-                if let Some(event) = input_event {
-                    let should_quit = matches!(event, InputEvent::Quit);
-                    if tx.send(event).await.is_err() {
-                        break;
-                    }
-                    
-                    // Exit on quit
-                    if should_quit {
-                        break;
-                    }
+            if let Some(event) = input_event {
+                let should_quit = matches!(event, InputEvent::Quit);
+                if tx.send(event).await.is_err() {
+                    break;
+                }
+                
+                // Exit on quit
+                if should_quit {
+                    break;
                 }
             }
         }

@@ -1,7 +1,7 @@
 use system_alert::{
     cli::{check_root, handle_input, parse_args, InputEvent},
     config::Config,
-    data_collector::DataCollector,
+    collectors::DataCollector,
     history::HistoryData,
     notification::NotificationManager,
     ui::UI,
@@ -45,11 +45,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     
     // Apply CLI overrides
-    config.merge_with_cli(cli_args.refresh_rate, cli_args.minimal_mode);
+    config.merge_with_cli(cli_args.refresh_rate, cli_args.minimal_mode, cli_args.theme.as_deref());
     
     // Initialize UI first - immediate startup
-    let mut ui = UI::new()?;
-    info!("UI initialized - starting data collection in background...");
+    let mut ui = UI::with_theme(&config.display.theme)?;
+    info!("UI initialized with theme '{}' - starting data collection in background...", config.display.theme);
     
     // Show loading screen immediately
     ui.show_loading_screen()?;
@@ -97,6 +97,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Some(InputEvent::Refresh) => {
                         // Force immediate refresh by continuing to the refresh logic
+                    }
+                    Some(InputEvent::CycleTheme) => {
+                        let themes = system_alert::ui::theme::Theme::all_themes();
+                        let current_index = themes.iter().position(|&t| t == config.display.theme).unwrap_or(0);
+                        let next_index = (current_index + 1) % themes.len();
+                        config.display.theme = themes[next_index].to_string();
+                        
+                        // Recreate UI with new theme
+                        ui = UI::with_theme(&config.display.theme)?;
+                        info!("Theme changed to: {}", config.display.theme);
                     }
                     None => {
                         warn!("Input channel closed");

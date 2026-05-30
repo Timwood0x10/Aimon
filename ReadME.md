@@ -89,6 +89,7 @@ Options:
 - **q** or **Ctrl+C**: Quit application
 - **n**: Toggle notifications
 - **r**: Force refresh
+- **t**: Cycle through themes
 
 ### Interface Layout
 
@@ -124,6 +125,38 @@ The application features a modern four-quadrant layout:
    - Network interface statistics
    - Bytes transmitted/received
    - Packet counts and rates
+
+## 🎨 Themes
+
+System Alert comes with 9 built-in themes to customize your monitoring experience:
+
+| Theme | Description | Style |
+|-------|-------------|-------|
+| **cyberpunk** | Neon-inspired dark theme (default) | Futuristic, vibrant |
+| **nord** | Nordic minimalist theme | Cool, calm, professional |
+| **dracula** | Classic dark theme | Vibrant, easy on eyes |
+| **tokyo_night** | Tokyo night sky inspired | Modern, sleek |
+| **monokai** | Classic editor theme | Warm, familiar |
+| **solarized_dark** | Solarized dark variant | Balanced, scientific |
+| **gruvbox** | Retro-inspired theme | Warm, nostalgic |
+| **catppuccin** | Soft pastel theme | Gentle, modern |
+| **one_dark** | Atom editor theme | Clean, professional |
+
+### Using Themes
+
+**Via configuration file:**
+```toml
+[display]
+theme = "nord"
+```
+
+**Via command line:**
+```bash
+cargo run -- --theme dracula
+```
+
+**Interactive switching:**
+Press `t` to cycle through all available themes while the application is running.
 
 ## ⚙️ Configuration Options
 

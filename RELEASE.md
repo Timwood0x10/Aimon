@@ -154,8 +154,12 @@ make release-cycle  # Full release build and test
 ./scripts/quick-release.sh  # One-command release
 ```
 
-## 📊 Version 0.1.0 Features
+## 📊 Version 0.2.0 Features
 
+✅ **Multi-theme system with 9 built-in themes**
+✅ **Interactive theme switching with 't' key**
+✅ **Command line theme selection**
+✅ **Configuration file theme persistence**
 ✅ **Complete real-time monitoring**
 ✅ **Advanced battery analytics** 
 ✅ **Apple Silicon optimization**
@@ -166,6 +170,6 @@ make release-cycle  # Full release build and test
 
 ---
 
-🎉 **Ready to release System Alert v0.1.0!**
+🎉 **Ready to release System Alert v0.2.0!**
 
 Choose your preferred method and let the automation handle the rest!

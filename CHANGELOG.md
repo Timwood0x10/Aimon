@@ -2,6 +2,38 @@
 
 All notable changes to the System Alert project will be documented in this file.
 
+## [2.1.0] - 2026-05-30
+
+### 🎨 Multi-Theme System
+
+Added comprehensive theme support with 9 built-in themes for a personalized monitoring experience.
+
+### ✨ New Features
+
+#### 🎭 Theme Support
+- **9 Built-in Themes**: Cyberpunk, Nord, Dracula, Tokyo Night, Monokai, Solarized Dark, Gruvbox, Catppuccin, One Dark
+- **Interactive Theme Switching**: Press `t` to cycle through themes in real-time
+- **Command Line Theme Selection**: `--theme <name>` argument for startup theme selection
+- **Configuration File Support**: Theme persistence via `config.toml` `[display]` section
+- **Case-Insensitive Matching**: Theme names are case-insensitive with alternative name support
+
+#### 🎯 Theme Features
+- **Cyberpunk** (Default): Neon-inspired dark theme with vibrant cyan and magenta accents
+- **Nord**: Nordic minimalist theme with cool, professional blue tones
+- **Dracula**: Classic dark theme with vibrant purple and pink accents
+- **Tokyo Night**: Modern dark theme inspired by Tokyo's night sky
+- **Monokai**: Warm, familiar theme from classic code editors
+- **Solarized Dark**: Scientifically balanced dark theme
+- **Gruvbox**: Retro-inspired warm theme with earthy tones
+- **Catppuccin**: Soft pastel theme with gentle colors
+- **One Dark**: Clean, professional theme from Atom editor
+
+#### 🔧 Technical Improvements
+- **Theme API**: Added `Theme::all_themes()`, `Theme::from_name()`, and `Theme::name()` methods
+- **Backward Compatibility**: Default theme remains Cyberpunk
+- **Dynamic Theme Switching**: UI recreation with new theme without application restart
+- **Configuration Integration**: Theme settings merged with CLI arguments and config files
+
 ## [2.0.0] - 2024-12-19
 
 ### 🎉 Major Update - Complete UI Redesign
