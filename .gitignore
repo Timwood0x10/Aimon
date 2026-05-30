@@ -4,4 +4,4 @@
 
 /release-builds
 
-/target_*
+.claude/

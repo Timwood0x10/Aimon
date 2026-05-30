@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+use crate::ui::layouts::LayoutType;
+
 /// Process sorting options
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ProcessSortBy {
@@ -23,6 +25,11 @@ impl Default for ProcessSortBy {
     }
 }
 
+/// Default language setting
+fn default_language() -> String {
+    "en".to_string()
+}
+
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -33,6 +40,8 @@ pub struct Config {
     pub notifications: NotificationConfig,
     #[serde(default)]
     pub process_sort_by: ProcessSortBy,
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 /// Alert threshold configuration
@@ -90,6 +99,7 @@ impl Default for Config {
                 cooldown_seconds: 30,
             },
             process_sort_by: ProcessSortBy::default(),
+            language: default_language(),
         }
     }
 }
@@ -123,6 +133,15 @@ impl Config {
         }
     }
 
+    /// Merge language CLI argument into config
+    pub fn merge_language(&mut self, lang: Option<&str>) {
+        if let Some(lang_str) = lang {
+            if lang_str == "en" || lang_str == "zh" {
+                self.language = lang_str.to_string();
+            }
+        }
+    }
+
     /// Validate configuration values
     fn validate(&self) -> Result<(), String> {
         if self.refresh_rate == 0 {
@@ -149,7 +168,82 @@ impl Config {
             return Err("history_size must be between 1 and 1000".to_string());
         }
 
+        if self.language != "en" && self.language != "zh" {
+            return Err("language must be 'en' or 'zh'".to_string());
+        }
+
         Ok(())
+    }
+}
+
+/// Runtime layout settings that persist between sessions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutSettings {
+    /// Currently active layout
+    #[serde(default)]
+    pub current_layout: LayoutType,
+    /// Process list sort order
+    #[serde(default)]
+    pub process_sort_by: ProcessSortBy,
+    /// Process list scroll offset
+    #[serde(default)]
+    pub process_scroll_offset: usize,
+    /// Party mode enabled
+    #[serde(default)]
+    pub party_mode: bool,
+}
+
+impl Default for LayoutSettings {
+    fn default() -> Self {
+        Self {
+            current_layout: LayoutType::Full,
+            process_sort_by: ProcessSortBy::Cpu,
+            process_scroll_offset: 0,
+            party_mode: false,
+        }
+    }
+}
+
+impl LayoutSettings {
+    /// Get the default path for runtime state file
+    fn default_state_path() -> std::path::PathBuf {
+        // Use XDG_CONFIG_HOME or ~/.config
+        let config_dir = std::env::var("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                std::path::PathBuf::from(home).join(".config")
+            });
+
+        config_dir.join("system-alert").join("state.toml")
+    }
+
+    /// Save runtime state to file
+    pub fn save_runtime_state(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let path = Self::default_state_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let content = toml::to_string_pretty(self)?;
+        fs::write(&path, content)?;
+        Ok(())
+    }
+
+    /// Load runtime state from file, returning default if file doesn't exist
+    pub fn load_runtime_state() -> Self {
+        let path = Self::default_state_path();
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                match toml::from_str::<LayoutSettings>(&content) {
+                    Ok(settings) => settings,
+                    Err(e) => {
+                        log::warn!("Failed to parse runtime state: {}. Using defaults.", e);
+                        LayoutSettings::default()
+                    }
+                }
+            }
+            Err(_) => LayoutSettings::default(),
+        }
     }
 }
 
@@ -379,5 +473,47 @@ mod tests {
     fn test_load_nonexistent_file() {
         let result = Config::load_from_file("/nonexistent/path/config.toml");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_config_layout_settings_default() {
+        let settings = LayoutSettings::default();
+        assert_eq!(settings.current_layout, LayoutType::Full);
+        assert_eq!(settings.process_sort_by, ProcessSortBy::Cpu);
+        assert_eq!(settings.process_scroll_offset, 0);
+        assert!(!settings.party_mode);
+    }
+
+    #[test]
+    fn test_config_save_load_runtime_state() {
+        use tempfile::NamedTempFile;
+
+        let settings = LayoutSettings {
+            current_layout: LayoutType::Compact,
+            process_sort_by: ProcessSortBy::Memory,
+            process_scroll_offset: 5,
+            party_mode: true,
+        };
+
+        // Test serialization roundtrip
+        let serialized = toml::to_string_pretty(&settings).unwrap();
+        let deserialized: LayoutSettings = toml::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.current_layout, LayoutType::Compact);
+        assert_eq!(deserialized.process_sort_by, ProcessSortBy::Memory);
+        assert_eq!(deserialized.process_scroll_offset, 5);
+        assert!(deserialized.party_mode);
+    }
+
+    #[test]
+    fn test_layout_settings_serialization() {
+        let settings = LayoutSettings::default();
+        let serialized = toml::to_string(&settings).unwrap();
+        let deserialized: LayoutSettings = toml::from_str(&serialized).unwrap();
+
+        assert_eq!(settings.current_layout, deserialized.current_layout);
+        assert_eq!(settings.process_sort_by, deserialized.process_sort_by);
+        assert_eq!(settings.process_scroll_offset, deserialized.process_scroll_offset);
+        assert_eq!(settings.party_mode, deserialized.party_mode);
     }
 }

@@ -83,7 +83,8 @@ pub fn render_chart<T: Into<f64> + Copy>(
             Block::default()
                 .title(format!(" {} ", config.title))
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(config.color)),
+                .border_style(Style::default().fg(config.color))
+                .style(Style::default().bg(Color::Black)),
         )
         .x_axis(
             Axis::default()
@@ -117,10 +118,11 @@ pub fn render_sparkline<T: Into<u64> + Copy>(
             Block::default()
                 .title(format!(" {} ", config.title))
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(config.color)),
+                .border_style(Style::default().fg(config.color))
+                .style(Style::default().bg(Color::Black)),
         )
         .data(&sparkline_data)
-        .style(Style::default().fg(config.color));
+        .style(Style::default().fg(config.color).bg(Color::Black));
     
     f.render_widget(sparkline, area);
 }

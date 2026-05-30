@@ -15,6 +15,11 @@ use crate::config::{Config, ProcessSortBy};
 use super::theme::Theme;
 use super::chart;
 
+/// Base style with theme foreground and background applied to all content
+fn base_style(theme: &Theme) -> Style {
+    Style::default().fg(theme.fg).bg(theme.bg)
+}
+
 /// Render header with system info
 pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let header_text = format!(
@@ -26,12 +31,13 @@ pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme
     );
 
     let header = Paragraph::new(header_text)
-        .style(Style::default().fg(theme.fg).bg(theme.bg))
+        .style(base_style(theme))
         .alignment(Alignment::Center)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.accent)),
+                .border_style(Style::default().fg(theme.accent))
+                .style(Style::default().bg(theme.bg)),
         );
 
     f.render_widget(header, area);
@@ -52,9 +58,10 @@ pub fn render_cpu_gauge(f: &mut Frame, area: Rect, usage: f32, theme: &Theme) {
             Block::default()
                 .title(" CPU ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.cpu_color)),
+                .border_style(Style::default().fg(theme.cpu_color))
+                .style(Style::default().bg(theme.bg)),
         )
-        .gauge_style(Style::default().fg(color))
+        .gauge_style(Style::default().fg(color).bg(theme.bg))
         .ratio(usage as f64 / 100.0)
         .label(format!("{:.1}%", usage));
 
@@ -76,9 +83,10 @@ pub fn render_mem_gauge(f: &mut Frame, area: Rect, usage: u16, theme: &Theme) {
             Block::default()
                 .title(" MEMORY ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.mem_color)),
+                .border_style(Style::default().fg(theme.mem_color))
+                .style(Style::default().bg(theme.bg)),
         )
-        .gauge_style(Style::default().fg(color))
+        .gauge_style(Style::default().fg(color).bg(theme.bg))
         .ratio(usage as f64 / 100.0)
         .label(format!("{}%", usage));
 
@@ -116,12 +124,15 @@ pub fn render_battery_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         )),
     ];
 
-    let block = Paragraph::new(lines).block(
-        Block::default()
-            .title(" BATTERY ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.battery_color)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" BATTERY ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.battery_color))
+                .style(Style::default().bg(theme.bg)),
+        );
 
     f.render_widget(block, area);
 }
@@ -150,22 +161,25 @@ pub fn render_power_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &
         )),
     ];
 
-    let block = Paragraph::new(lines).block(
-        Block::default()
-            .title(" POWER ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" POWER ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.accent))
+                .style(Style::default().bg(theme.bg)),
+        );
 
     f.render_widget(block, area);
 }
 
 /// Render process list
 pub fn render_process_list(f: &mut Frame, area: Rect, data: &SystemData, config: &Config, theme: &Theme) {
-    // 使用引用而非克隆，避免每次渲染都克隆整个列表
+    // Use indices to avoid cloning the entire process list on every render
     let mut indices: Vec<usize> = (0..data.process_info.len()).collect();
     
-    // 根据配置排序
+    // Sort by configured criteria
     match config.process_sort_by {
         ProcessSortBy::Cpu => {
             indices.sort_by(|&a, &b| {
@@ -199,7 +213,7 @@ pub fn render_process_list(f: &mut Frame, area: Rect, data: &SystemData, config:
         }
     }
     
-    // 只取前8个进程
+    // Only show top 8 processes
     indices.truncate(8);
 
     let lines: Vec<Line> = indices
@@ -217,7 +231,7 @@ pub fn render_process_list(f: &mut Frame, area: Rect, data: &SystemData, config:
             Line::from(vec![
                 Span::styled(
                     format!("{:>6} ", p.pid),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(Color::Gray),
                 ),
                 Span::styled(
                     format!("{:>5.1}% ", p.cpu_usage),
@@ -236,21 +250,24 @@ pub fn render_process_list(f: &mut Frame, area: Rect, data: &SystemData, config:
         .collect();
 
     let header = Line::from(vec![
-        Span::styled("  PID  ", Style::default().fg(Color::DarkGray)),
-        Span::styled(" CPU%  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("  MEM  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("NAME", Style::default().fg(Color::DarkGray)),
+        Span::styled("  PID  ", Style::default().fg(Color::Gray)),
+        Span::styled(" CPU%  ", Style::default().fg(Color::Gray)),
+        Span::styled("  MEM  ", Style::default().fg(Color::Gray)),
+        Span::styled("NAME", Style::default().fg(Color::Gray)),
     ]);
 
     let mut all_lines = vec![header];
     all_lines.extend(lines);
 
-    let block = Paragraph::new(all_lines).block(
-        Block::default()
-            .title(" PROCESSES ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray)),
-    );
+    let block = Paragraph::new(all_lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" PROCESSES ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Gray))
+                .style(Style::default().bg(theme.bg)),
+        );
 
     f.render_widget(block, area);
 }
@@ -260,11 +277,11 @@ pub fn render_network_stats(f: &mut Frame, area: Rect, data: &SystemData, histor
     let total_rx: u64 = data.network_info.iter().map(|n| n.bytes_received).sum();
     let total_tx: u64 = data.network_info.iter().map(|n| n.bytes_transmitted).sum();
     
-    // 获取实时速率
+    // Get real-time rates
     let rx_rate = history.get_network_rx_rate();
     let tx_rate = history.get_network_tx_rate();
 
-    // 格式化速率显示
+    // Format rate display
     let format_rate = |rate: f64| -> String {
         if rate >= 1024.0 * 1024.0 {
             format!("{:.2} MB/s", rate / 1024.0 / 1024.0)
@@ -295,12 +312,15 @@ pub fn render_network_stats(f: &mut Frame, area: Rect, data: &SystemData, histor
         )),
     ];
 
-    let block = Paragraph::new(lines).block(
-        Block::default()
-            .title(" NETWORK ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.net_rx_color)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" NETWORK ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.net_rx_color))
+                .style(Style::default().bg(theme.bg)),
+        );
 
     f.render_widget(block, area);
 }
@@ -335,12 +355,15 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         )),
     ];
 
-    let block = Paragraph::new(lines).block(
-        Block::default()
-            .title(" THERMAL ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.temp_color)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" THERMAL ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.temp_color))
+                .style(Style::default().bg(theme.bg)),
+        );
 
     f.render_widget(block, area);
 }
@@ -381,7 +404,7 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
         let line = Line::from(vec![
             Span::styled(
                 format!("C{:02} ", i),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             ),
             Span::styled(
                 format!("{}{}", bar, empty),
@@ -395,12 +418,15 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
         lines.push(line);
     }
 
-    let block = Paragraph::new(lines).block(
-        Block::default()
-            .title(" CPU CORES ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.cpu_color)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" CPU CORES ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.cpu_color))
+                .style(Style::default().bg(theme.bg)),
+        );
 
     f.render_widget(block, area);
 }
@@ -409,4 +435,180 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
 pub fn render_network_sparkline(f: &mut Frame, area: Rect, history: &HistoryData, theme: &Theme) {
     let config = chart::SparklineConfig::new("NET RX", theme.net_rx_color);
     chart::render_sparkline(f, area, &history.network_rx_history, &config);
+}
+
+/// Get color for thermal pressure value
+pub fn thermal_pressure_color(pressure: u8, theme: &Theme) -> Color {
+    if pressure > 80 {
+        theme.critical_color
+    } else if pressure > 50 {
+        theme.warning_color
+    } else {
+        theme.temp_color
+    }
+}
+
+/// Render a compact process list showing only top N processes
+pub fn render_compact_process_list(f: &mut Frame, area: Rect, data: &SystemData, max_count: usize, theme: &Theme) {
+    let mut indices: Vec<usize> = (0..data.process_info.len()).collect();
+    indices.sort_by(|&a, &b| {
+        data.process_info[b]
+            .cpu_usage
+            .partial_cmp(&data.process_info[a].cpu_usage)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    indices.truncate(max_count);
+
+    let lines: Vec<Line> = indices
+        .iter()
+        .map(|&i| {
+            let p = &data.process_info[i];
+            let cpu_color = if p.cpu_usage > 50.0 {
+                theme.critical_color
+            } else if p.cpu_usage > 20.0 {
+                theme.warning_color
+            } else {
+                theme.fg
+            };
+
+            Line::from(vec![
+                Span::styled(
+                    format!("{:>5.1}% ", p.cpu_usage),
+                    Style::default().fg(cpu_color),
+                ),
+                Span::styled(
+                    p.name.chars().take(15).collect::<String>(),
+                    Style::default().fg(theme.fg),
+                ),
+            ])
+        })
+        .collect();
+
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(
+            Block::default()
+                .title(" TOP PROCS ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Gray))
+                .style(Style::default().bg(theme.bg)),
+        );
+
+    f.render_widget(block, area);
+}
+
+/// Render a centered help overlay with all keybindings
+pub fn render_help_overlay(f: &mut Frame, theme: &Theme) {
+    use ratatui::layout::{Constraint, Direction, Layout};
+
+    // Create a centered area for the help popup
+    let area = f.size();
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(15),
+            Constraint::Percentage(70),
+            Constraint::Percentage(15),
+        ])
+        .split(area);
+
+    let horizontal = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(20),
+            Constraint::Percentage(60),
+            Constraint::Percentage(20),
+        ])
+        .split(vertical[1]);
+
+    let popup_area = horizontal[1];
+
+    let help_lines = vec![
+        Line::from(Span::styled(
+            " KEYBINDINGS ",
+            Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(" NAVIGATION", Style::default().fg(theme.cpu_color).add_modifier(Modifier::BOLD))),
+        Line::from(vec![
+            Span::styled("  h / Left    ", Style::default().fg(theme.accent)),
+            Span::styled("Previous layout", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  l / Right   ", Style::default().fg(theme.accent)),
+            Span::styled("Next layout", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  j / Down    ", Style::default().fg(theme.accent)),
+            Span::styled("Scroll down", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  k / Up      ", Style::default().fg(theme.accent)),
+            Span::styled("Scroll up", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  g           ", Style::default().fg(theme.accent)),
+            Span::styled("Go to top", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  G           ", Style::default().fg(theme.accent)),
+            Span::styled("Go to bottom", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(" LAYOUTS", Style::default().fg(theme.cpu_color).add_modifier(Modifier::BOLD))),
+        Line::from(vec![
+            Span::styled("  1-7         ", Style::default().fg(theme.accent)),
+            Span::styled("Jump to layout (Full/Minimal/Compact/Battery/GPU/Network/Health)", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(" ACTIONS", Style::default().fg(theme.cpu_color).add_modifier(Modifier::BOLD))),
+        Line::from(vec![
+            Span::styled("  s / S       ", Style::default().fg(theme.accent)),
+            Span::styled("Cycle process sort forward/backward", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  /           ", Style::default().fg(theme.accent)),
+            Span::styled("Search processes", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  F9          ", Style::default().fg(theme.accent)),
+            Span::styled("Kill selected process", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  t           ", Style::default().fg(theme.accent)),
+            Span::styled("Cycle theme", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  n           ", Style::default().fg(theme.accent)),
+            Span::styled("Toggle notifications", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  r           ", Style::default().fg(theme.accent)),
+            Span::styled("Force refresh", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  ?           ", Style::default().fg(theme.accent)),
+            Span::styled("Toggle this help", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  q / Ctrl+C  ", Style::default().fg(theme.accent)),
+            Span::styled("Quit", Style::default().fg(theme.fg)),
+        ]),
+    ];
+
+    let help_popup = Paragraph::new(help_lines)
+        .block(
+            Block::default()
+                .title(" HELP (? to close) ")
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+        )
+        .alignment(Alignment::Left);
+
+    // Clear the background area with a dim overlay
+    let clear_block = Block::default().style(Style::default().bg(Color::Black));
+    f.render_widget(clear_block, area);
+
+    f.render_widget(help_popup, popup_area);
 }

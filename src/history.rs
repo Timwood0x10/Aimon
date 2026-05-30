@@ -57,7 +57,7 @@ impl HistoryData {
         Self::push_capped_static(network_rx_history, max_size, total_rx);
         Self::push_capped_static(network_tx_history, max_size, total_tx);
 
-        // 计算网络速率
+        // Calculate network rate
         let now = Instant::now();
         if let (Some(last_time), Some(last_rx), Some(last_tx)) = 
             (self.last_update, self.last_network_rx, self.last_network_tx) 
@@ -101,8 +101,9 @@ impl HistoryData {
         if self.memory_history.len() < 2 {
             return None;
         }
-        let recent: f32 = self.memory_history.iter().rev().take(5).map(|&x| x as f32).sum::<f32>() / 5.0;
-        let older: f32 = self.memory_history.iter().take(5).map(|&x| x as f32).sum::<f32>() / 5.0;
+        let count = self.memory_history.len().min(5) as f32;
+        let recent: f32 = self.memory_history.iter().rev().take(5).map(|&x| x as f32).sum::<f32>() / count;
+        let older: f32 = self.memory_history.iter().take(5).map(|&x| x as f32).sum::<f32>() / count;
         Some(recent - older)
     }
 
@@ -121,8 +122,9 @@ impl HistoryData {
         if history.len() < 2 {
             return None;
         }
-        let recent: f32 = history.iter().rev().take(5).sum::<f32>() / 5.0;
-        let older: f32 = history.iter().take(5).sum::<f32>() / 5.0;
+        let count = history.len().min(5) as f32;
+        let recent: f32 = history.iter().rev().take(5).sum::<f32>() / count;
+        let older: f32 = history.iter().take(5).sum::<f32>() / count;
         Some(recent - older)
     }
 }

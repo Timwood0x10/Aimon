@@ -106,6 +106,8 @@ async fn parse_cpu_metrics(
     let mut p_cluster_freq_sum = 0.0;
     let mut e_cluster_count = 0;
     let mut p_cluster_count = 0;
+    let mut e_cluster_freq_count = 0;
+    let mut p_cluster_freq_count = 0;
 
     for line in &lines {
         if let Some(caps) = ACTIVE_RESIDENCY_REGEX.captures(line) {
@@ -124,8 +126,10 @@ async fn parse_cpu_metrics(
             if let (Ok(core_id), Ok(active_freq)) = (caps[1].parse::<usize>(), caps[2].parse::<f64>()) {
                 if core_id <= 3 {
                     e_cluster_freq_sum += active_freq;
+                    e_cluster_freq_count += 1;
                 } else {
                     p_cluster_freq_sum += active_freq;
+                    p_cluster_freq_count += 1;
                 }
             }
         }
@@ -159,12 +163,16 @@ async fn parse_cpu_metrics(
 
     if e_cluster_count > 0 {
         cpu_metrics.e_cluster_active = (e_cluster_active_sum / e_cluster_count as f64) as i32;
-        cpu_metrics.e_cluster_freq_mhz = (e_cluster_freq_sum / e_cluster_count as f64) as i32;
+    }
+    if e_cluster_freq_count > 0 {
+        cpu_metrics.e_cluster_freq_mhz = (e_cluster_freq_sum / e_cluster_freq_count as f64) as i32;
     }
 
     if p_cluster_count > 0 {
         cpu_metrics.p_cluster_active = (p_cluster_active_sum / p_cluster_count as f64) as i32;
-        cpu_metrics.p_cluster_freq_mhz = (p_cluster_freq_sum / p_cluster_count as f64) as i32;
+    }
+    if p_cluster_freq_count > 0 {
+        cpu_metrics.p_cluster_freq_mhz = (p_cluster_freq_sum / p_cluster_freq_count as f64) as i32;
     }
 
     Ok(cpu_metrics)

@@ -1,10 +1,11 @@
 use system_alert::{
     cli::{check_root, handle_input, parse_args, InputEvent},
-    config::Config,
+    config::{Config, ProcessSortBy},
     collectors::DataCollector,
     history::HistoryData,
     notification::NotificationManager,
     ui::UI,
+    ui::layouts::LayoutType,
     types::*,
 };
 
@@ -46,7 +47,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Apply CLI overrides
     config.merge_with_cli(cli_args.refresh_rate, cli_args.minimal_mode, cli_args.theme.as_deref());
-    
+
+    // Handle headless/API modes before UI initialization
+    if cli_args.json_output {
+        let mut exporter = system_alert::api::HeadlessExporter::new();
+        match exporter.export_json().await {
+            Ok(output) => {
+                println!("{}", output);
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Error collecting data: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if cli_args.csv_output {
+        let mut exporter = system_alert::api::HeadlessExporter::new();
+        match exporter.export_csv().await {
+            Ok(output) => {
+                print!("{}", output);
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Error collecting data: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if let Some(ref format_str) = cli_args.stream_format {
+        match system_alert::api::OutputFormat::from_str(format_str) {
+            Some(format) => {
+                let interval = cli_args.refresh_rate.unwrap_or(1);
+                if let Err(e) = system_alert::api::HeadlessExporter::export_stream(interval, format).await {
+                    eprintln!("Stream error: {}", e);
+                    std::process::exit(1);
+                }
+                return Ok(());
+            }
+            None => {
+                eprintln!("Unknown stream format: {}. Use json, csv, or prometheus.", format_str);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    // Shared data collector for API server mode (held alive for server lifetime)
+    let _api_collector = if cli_args.server_mode {
+        let collector = std::sync::Arc::new(tokio::sync::Mutex::new(
+            system_alert::collectors::DataCollector::new_fast(),
+        ));
+        if let Err(e) = system_alert::api::ApiServer::start("0.0.0.0", cli_args.port, collector.clone()).await {
+            eprintln!("Failed to start API server: {}", e);
+            std::process::exit(1);
+        }
+        Some(collector)
+    } else {
+        None
+    };
+
     // Initialize UI first - immediate startup
     let mut ui = UI::with_theme(&config.display.theme)?;
     info!("UI initialized with theme '{}' - starting data collection in background...", config.display.theme);
@@ -71,8 +132,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create initial empty data for immediate display
     let mut system_data = create_placeholder_data();
     
-    info!("System monitor initialized. Press 'q' to quit, 'n' to toggle notifications, 'r' to force refresh.");
-    
+    info!("System monitor initialized. Press '?' for help, 'q' to quit.");
+
     // Main event loop
     loop {
         tokio::select! {
@@ -84,10 +145,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         break;
                     }
                     Some(InputEvent::NextTab) => {
-                        ui.next_tab();
+                        ui.next_layout();
                     }
                     Some(InputEvent::PreviousTab) => {
-                        ui.previous_tab();
+                        ui.previous_layout();
+                    }
+                    Some(InputEvent::NextLayout) => {
+                        ui.next_layout();
+                    }
+                    Some(InputEvent::PreviousLayout) => {
+                        ui.previous_layout();
+                    }
+                    Some(InputEvent::ScrollUp) => {
+                        ui.scroll_up();
+                    }
+                    Some(InputEvent::ScrollDown) => {
+                        ui.scroll_down();
+                    }
+                    Some(InputEvent::GoToTop) => {
+                        ui.go_to_top();
+                    }
+                    Some(InputEvent::GoToBottom) => {
+                        ui.go_to_bottom();
+                    }
+                    Some(InputEvent::JumpToLayout(n)) => {
+                        if let Some(layout) = LayoutType::from_key_number(n) {
+                            ui.set_layout(layout);
+                        }
+                    }
+                    Some(InputEvent::CycleSortForward) => {
+                        config.process_sort_by = match config.process_sort_by {
+                            ProcessSortBy::Cpu => ProcessSortBy::Memory,
+                            ProcessSortBy::Memory => ProcessSortBy::Pid,
+                            ProcessSortBy::Pid => ProcessSortBy::Name,
+                            ProcessSortBy::Name => ProcessSortBy::Cpu,
+                        };
+                        info!("Sort order: {:?}", config.process_sort_by);
+                    }
+                    Some(InputEvent::CycleSortBackward) => {
+                        config.process_sort_by = match config.process_sort_by {
+                            ProcessSortBy::Cpu => ProcessSortBy::Name,
+                            ProcessSortBy::Memory => ProcessSortBy::Cpu,
+                            ProcessSortBy::Pid => ProcessSortBy::Memory,
+                            ProcessSortBy::Name => ProcessSortBy::Pid,
+                        };
+                        info!("Sort order: {:?}", config.process_sort_by);
+                    }
+                    Some(InputEvent::ToggleHelp) => {
+                        ui.toggle_help();
                     }
                     Some(InputEvent::ToggleNotifications) => {
                         let new_state = !config.notifications.enabled;
@@ -103,10 +208,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let current_index = themes.iter().position(|&t| t == config.display.theme).unwrap_or(0);
                         let next_index = (current_index + 1) % themes.len();
                         config.display.theme = themes[next_index].to_string();
-                        
+
                         // Recreate UI with new theme
-                        ui = UI::with_theme(&config.display.theme)?;
+                        ui = UI::with_theme_and_layout(&config.display.theme, ui.current_layout())?;
                         info!("Theme changed to: {}", config.display.theme);
+                    }
+                    Some(InputEvent::TogglePartyMode) => {
+                        ui.toggle_party_mode();
+                    }
+                    Some(InputEvent::SearchProcess) => {
+                        // Search not yet implemented - placeholder event
+                        info!("Search not yet implemented");
+                    }
+                    Some(InputEvent::KillProcess) => {
+                        // Kill not yet implemented - placeholder event
+                        info!("Kill process not yet implemented");
+                    }
+                    Some(InputEvent::ToggleTimeTravel) => {
+                        info!("Time travel not yet implemented");
+                    }
+                    Some(InputEvent::ToggleAchievements) => {
+                        info!("Achievements not yet implemented");
                     }
                     None => {
                         warn!("Input channel closed");
@@ -114,7 +236,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            
+
             // Handle periodic refresh
             _ = refresh_interval.tick() => {
                 // Collect system data asynchronously
@@ -123,7 +245,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         system_data = new_data;
                         // Update history
                         history.update_from_system_data(&system_data);
-                        
+
                         // Check for notifications
                         if let Err(e) = notification_manager
                             .check_and_send_notifications(&system_data, &config.thresholds)
@@ -137,7 +259,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // Keep using previous data, don't crash
                     }
                 }
-                
+
                 // Always update UI (even with old data)
                 if let Err(e) = ui.draw(&system_data, &history, &config) {
                     error!("UI draw error: {}", e);
@@ -145,11 +267,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    
+
+    // Save runtime state before exit
+    ui.save_runtime_state(&config);
+
     // Cleanup
     ui.cleanup()?;
     info!("System monitor exited normally");
-    
+
     Ok(())
 }
 

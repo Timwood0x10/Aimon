@@ -24,16 +24,18 @@ pub async fn collect_thermal_info() -> ThermalInfo {
     // Check for thermal throttling via CPU frequency scaling
     thermal_info.thermal_throttling = thermal_info.thermal_pressure > 50;
     
-    // Get fan speeds from powermetrics if available
-    if let Ok(output) = tokio::process::Command::new("powermetrics")
-        .arg("--samplers")
-        .arg("smc")
-        .arg("-n")
-        .arg("1")
-        .arg("--show-initial-usage")
-        .output()
-        .await
-    {
+    // Get fan speeds from powermetrics if available (with timeout to prevent hangs)
+    let power_result = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::process::Command::new("powermetrics")
+            .arg("--samplers")
+            .arg("smc")
+            .arg("-n")
+            .arg("1")
+            .arg("--show-initial-usage")
+            .output(),
+    ).await;
+    if let Ok(Ok(output)) = power_result {
         if let Ok(power_str) = String::from_utf8(output.stdout) {
             let mut fan_speeds = Vec::new();
             for line in power_str.lines() {

@@ -1,9 +1,11 @@
+pub mod api;
 pub mod battery_collector;
 pub mod cli;
 pub mod config;
 pub mod collectors;
 pub mod data_collector;
 pub mod history;
+pub mod i18n;
 pub mod notification;
 pub mod types;
 pub mod ui;

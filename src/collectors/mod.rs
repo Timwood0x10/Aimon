@@ -60,9 +60,8 @@ impl DataCollector {
 
     /// Collect all system data
     pub async fn collect_all_data(&mut self) -> Result<SystemData, Box<dyn std::error::Error>> {
-        // Smart refresh - only refresh necessary data
+        // Refresh system data
         self.system.refresh_all();
-        self.system.refresh_memory();
         self.system.refresh_processes();
         self.networks.refresh();
         self.components.refresh();

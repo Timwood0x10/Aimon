@@ -34,10 +34,14 @@ impl Notification {
             AlertLevel::Warning => "Warning",
             AlertLevel::Critical => "Critical Alert",
         };
-        
+
+        // Escape double quotes in user-controlled strings to prevent AppleScript injection
+        let safe_message = self.message.replace('\\', "\\\\").replace('"', "\\\"");
+        let safe_title = self.title.replace('\\', "\\\\").replace('"', "\\\"");
+
         let script = format!(
             r#"display notification "{}" with title "{}" subtitle "{}""#,
-            self.message, self.title, subtitle
+            safe_message, safe_title, subtitle
         );
         
         tokio::process::Command::new("osascript")

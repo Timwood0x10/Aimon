@@ -1,7 +1,8 @@
+use serde::Serialize;
 use std::time::Instant;
 use sysinfo::Pid;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub struct CPUMetrics {
     pub e_cluster_active: i32,
     pub p_cluster_active: i32,
@@ -28,7 +29,7 @@ impl std::fmt::Display for CPUMetrics {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SystemInfo {
     pub name: String,
     pub kernel_version: String,
@@ -38,14 +39,14 @@ pub struct SystemInfo {
     pub cpu_brand: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CpuInfo {
     pub core_usages: Vec<f32>,
     pub average_usage: f32,
     pub power_metrics: CPUMetrics,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MemoryInfo {
     pub total_memory: u64,
     pub used_memory: u64,
@@ -55,7 +56,7 @@ pub struct MemoryInfo {
     pub usage_percentage: u16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NetworkInterface {
     pub name: String,
     pub bytes_received: u64,
@@ -64,15 +65,20 @@ pub struct NetworkInterface {
     pub packets_transmitted: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TemperatureInfo {
     pub label: String,
     pub temperature: f32,
     pub critical_temperature: f32,
 }
 
-#[derive(Debug, Clone)]
+fn serialize_pid<S: serde::Serializer>(pid: &Pid, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_u64(pid.as_u32() as u64)
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ProcessInfo {
+    #[serde(serialize_with = "serialize_pid")]
     pub pid: Pid,
     pub name: String,
     pub cpu_usage: f32,
@@ -81,7 +87,7 @@ pub struct ProcessInfo {
     pub disk_write_bytes: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BatteryInfo {
     pub percentage: f32,
     pub is_charging: bool,
@@ -116,7 +122,7 @@ impl Default for BatteryInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ThermalInfo {
     pub fan_speeds: Vec<u32>, // RPM
     pub thermal_throttling: bool,
@@ -135,7 +141,7 @@ impl Default for ThermalInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PerformanceMetrics {
     pub instructions_per_watt: f64,
     pub performance_per_watt: f64,
@@ -154,7 +160,7 @@ impl Default for PerformanceMetrics {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SystemHealthInfo {
     pub uptime_seconds: u64,
     pub sleep_wake_efficiency: f32, // %
@@ -177,7 +183,7 @@ impl Default for SystemHealthInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SystemData {
     pub system_info: SystemInfo,
     pub cpu_info: CpuInfo,
@@ -189,5 +195,6 @@ pub struct SystemData {
     pub thermal_info: ThermalInfo,
     pub performance_metrics: PerformanceMetrics,
     pub system_health: SystemHealthInfo,
+    #[serde(skip)]
     pub timestamp: Instant,
 }

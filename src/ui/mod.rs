@@ -5,25 +5,41 @@ pub mod theme;
 pub mod components;
 pub mod layout;
 pub mod chart;
+pub mod layouts;
+pub mod chip_heatmap;
+pub mod party_mode;
+pub mod retro_effects;
+pub mod sonification;
 
-use crate::{config::Config, history::HistoryData, types::*};
+use crate::config::{Config, LayoutSettings};
+use crate::history::HistoryData;
+use crate::types::*;
+use crate::ui::layouts::LayoutType;
 use ratatui::{
     backend::TermionBackend,
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame, Terminal,
 };
 use std::io;
 use termion::raw::IntoRawMode;
 
 use self::theme::Theme;
+use self::party_mode::PartyMode;
 
 /// Main UI structure
 pub struct UI {
     terminal: Terminal<TermionBackend<termion::raw::RawTerminal<std::io::Stderr>>>,
     theme: Theme,
+    party_state: PartyMode,
+    /// Currently active layout
+    current_layout: LayoutType,
+    /// Whether help overlay is shown
+    show_help: bool,
+    /// Process list scroll offset
+    scroll_offset: usize,
 }
 
 impl UI {
@@ -41,10 +57,32 @@ impl UI {
             Theme::cyberpunk()
         });
 
+        // Load persisted layout settings
+        let settings = LayoutSettings::load_runtime_state();
+
         Ok(Self {
             terminal,
             theme,
+            party_state: PartyMode::new(),
+            current_layout: settings.current_layout,
+            show_help: false,
+            scroll_offset: settings.process_scroll_offset,
         })
+    }
+
+    /// Create UI with theme and initial layout
+    pub fn with_theme_and_layout(theme_name: &str, layout: LayoutType) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut ui = Self::with_theme(theme_name)?;
+        ui.current_layout = layout;
+        Ok(ui)
+    }
+
+    /// Fill the entire terminal area with the theme background color.
+    /// This prevents terminal transparency from showing through.
+    fn fill_background(f: &mut Frame, area: Rect, bg: Color) {
+        let bg_block = Block::default().style(Style::default().bg(bg));
+        f.render_widget(Clear, area);
+        f.render_widget(bg_block, area);
     }
 
     /// Show loading screen with animation
@@ -53,10 +91,11 @@ impl UI {
 
         self.terminal.draw(|f| {
             let size = f.size();
+            Self::fill_background(f, size, theme.bg);
 
             let loading_lines = vec![
                 Line::from(Span::styled(
-                    "⚡ SYSTEM ALERT ⚡",
+                    "SYSTEM ALERT",
                     Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
@@ -101,7 +140,7 @@ impl UI {
         Ok(())
     }
 
-    /// Main draw function - renders the complete UI
+    /// Main draw function - dispatches to the current layout
     pub fn draw(
         &mut self,
         data: &SystemData,
@@ -109,76 +148,124 @@ impl UI {
         config: &Config,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let theme = &self.theme;
+        let current_layout = self.current_layout;
+        let show_help = self.show_help;
 
         self.terminal.draw(|f| {
-            if config.minimal_mode {
-                Self::draw_minimal(f, data, theme);
-            } else {
-                Self::draw_full(f, data, history, config, theme);
+            // Fill background first to prevent terminal transparency
+            Self::fill_background(f, f.size(), theme.bg);
+
+            // Draw the current layout
+            match current_layout {
+                LayoutType::Full => {
+                    layouts::full::draw(f, data, history, config, theme);
+                }
+                LayoutType::Minimal => {
+                    layouts::minimal::draw(f, data, theme);
+                }
+                LayoutType::Compact => {
+                    layouts::compact::draw(f, data, history, theme);
+                }
+                LayoutType::BatteryFocus => {
+                    layouts::battery_focus::draw(f, data, history, theme);
+                }
+                LayoutType::GpuFocus => {
+                    layouts::gpu_focus::draw(f, data, history, theme);
+                }
+                LayoutType::NetworkFocus => {
+                    layouts::network_focus::draw(f, data, history, theme);
+                }
+                LayoutType::SystemHealth => {
+                    layouts::system_health::draw(f, data, history, theme);
+                }
+            }
+
+            // Draw help overlay on top if active
+            if show_help {
+                components::render_help_overlay(f, theme);
             }
         })?;
 
         Ok(())
     }
 
-    /// Minimal mode - just CPU and memory gauges
-    fn draw_minimal(f: &mut Frame, data: &SystemData, theme: &Theme) {
-        let areas = layout::create_minimal_layout(f.size());
-
-        components::render_cpu_gauge(f, areas[0], data.cpu_info.average_usage, theme);
-        components::render_mem_gauge(f, areas[1], data.memory_info.usage_percentage, theme);
+    /// Switch to the next layout in sequence
+    pub fn next_layout(&mut self) {
+        let all = LayoutType::all();
+        let current_idx = all.iter().position(|&l| l == self.current_layout).unwrap_or(0);
+        let next_idx = (current_idx + 1) % all.len();
+        self.current_layout = all[next_idx];
+        log::info!("Layout changed to: {}", self.current_layout);
     }
 
-    /// Full mode - comprehensive system overview
-    fn draw_full(f: &mut Frame, data: &SystemData, history: &HistoryData, config: &Config, theme: &Theme) {
-        let main = layout::create_full_layout(f.size());
-
-        // Header with system info
-        components::render_header(f, main[0], data, theme);
-
-        // Top section: CPU, Memory, Battery, Power
-        let top = layout::create_top_stats_layout(main[1]);
-
-        Self::render_cpu_stats(f, top[0], data, theme);
-        Self::render_mem_stats(f, top[1], data, theme);
-        components::render_battery_stats(f, top[2], data, theme);
-        components::render_power_stats(f, top[3], data, theme);
-
-        // Middle section: Charts + CPU Cores
-        let mid = layout::create_charts_layout(main[2]);
-        
-        // Left side: CPU history chart
-        Self::render_cpu_chart(f, mid[0], history, theme);
-        
-        // Right side: CPU cores bar chart
-        components::render_cpu_cores_bar_chart(f, mid[1], data, theme);
-
-        // Bottom section: Processes, Network, Thermal, Network Sparkline
-        let bottom = layout::create_bottom_stats_layout(main[3]);
-
-        components::render_process_list(f, bottom[0], data, config, theme);
-        components::render_network_stats(f, bottom[1], data, history, theme);
-        components::render_thermal_stats(f, bottom[2], data, theme);
-        components::render_network_sparkline(f, bottom[3], history, theme);
+    /// Switch to the previous layout in sequence
+    pub fn previous_layout(&mut self) {
+        let all = LayoutType::all();
+        let current_idx = all.iter().position(|&l| l == self.current_layout).unwrap_or(0);
+        let prev_idx = if current_idx == 0 { all.len() - 1 } else { current_idx - 1 };
+        self.current_layout = all[prev_idx];
+        log::info!("Layout changed to: {}", self.current_layout);
     }
 
-    /// Render CPU statistics panel
-    fn render_cpu_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
-        components::render_cpu_gauge(f, area, data.cpu_info.average_usage, theme);
+    /// Jump to a specific layout by type
+    pub fn set_layout(&mut self, layout: LayoutType) {
+        self.current_layout = layout;
+        log::info!("Layout set to: {}", self.current_layout);
     }
 
-    /// Render memory statistics panel
-    fn render_mem_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
-        components::render_mem_gauge(f, area, data.memory_info.usage_percentage, theme);
+    /// Get the current layout type
+    pub fn current_layout(&self) -> LayoutType {
+        self.current_layout
     }
 
-    /// Render CPU history chart
-    fn render_cpu_chart(f: &mut Frame, area: Rect, history: &HistoryData, theme: &Theme) {
-        let config = chart::ChartConfig::new("CPU HISTORY", 0.0, 100.0, theme.cpu_color);
-        chart::render_chart(f, area, &history.cpu_history, &config);
+    /// Toggle help overlay visibility
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
     }
 
-    
+    /// Scroll process list down
+    pub fn scroll_down(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_add(1);
+    }
+
+    /// Scroll process list up
+    pub fn scroll_up(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(1);
+    }
+
+    /// Jump to top of process list
+    pub fn go_to_top(&mut self) {
+        self.scroll_offset = 0;
+    }
+
+    /// Jump to bottom of process list
+    pub fn go_to_bottom(&mut self) {
+        // Will be clamped during render based on actual process count
+        self.scroll_offset = usize::MAX;
+    }
+
+    /// Get current scroll offset
+    pub fn scroll_offset(&self) -> usize {
+        self.scroll_offset
+    }
+
+    /// Save current runtime state for persistence
+    pub fn save_runtime_state(&self, config: &Config) {
+        let settings = LayoutSettings {
+            current_layout: self.current_layout,
+            process_sort_by: config.process_sort_by.clone(),
+            process_scroll_offset: self.scroll_offset,
+            party_mode: false,
+        };
+        if let Err(e) = settings.save_runtime_state() {
+            log::warn!("Failed to save runtime state: {}", e);
+        }
+    }
+
+    /// Toggle party mode on/off
+    pub fn toggle_party_mode(&mut self) {
+        self.party_state.toggle();
+    }
 
     /// Cleanup terminal
     pub fn cleanup(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -187,6 +274,11 @@ impl UI {
         Ok(())
     }
 
-    pub fn next_tab(&mut self) {}
-    pub fn previous_tab(&mut self) {}
+    pub fn next_tab(&mut self) {
+        self.next_layout();
+    }
+
+    pub fn previous_tab(&mut self) {
+        self.previous_layout();
+    }
 }
