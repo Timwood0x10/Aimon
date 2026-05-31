@@ -49,10 +49,9 @@ pub fn draw(
     let mid = layout::create_charts_layout(main[2]);
 
     // Left side: CPU history chart
-    let chart_config =
-        super::super::chart::ChartConfig::new("CPU HISTORY", 0.0, 100.0, theme.cpu_color)
-            .with_bg(theme.bg)
-            .with_border_color(theme.border_color);
+    let chart_config = super::super::chart::ChartConfig::new("CPU HISTORY", 0.0, 100.0, theme.fg)
+        .with_bg(theme.bg)
+        .with_border_color(theme.border_color);
     super::super::chart::render_chart(f, mid[0], &history.cpu_history, &chart_config);
 
     // Right side: CPU cores bar chart

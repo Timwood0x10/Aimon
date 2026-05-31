@@ -136,38 +136,16 @@ pub fn render_utilization_history_chart<T: Into<f64> + Copy>(
     current: f64,
     theme: &Theme,
 ) {
-    let bg = utilization_background(current);
-    let line_color = utilization_line_color(current);
     let config = chart::ChartConfig::new(
         &format!("{} {:>5.1}%", title, current),
         0.0,
         100.0,
-        line_color,
+        theme.fg,
     )
-    .with_bg(bg)
+    .with_bg(theme.bg)
     .with_border_color(theme.border_color);
 
     chart::render_chart(f, area, data, &config);
-}
-
-fn utilization_line_color(value: f64) -> Color {
-    if value > 70.0 {
-        Color::Rgb(255, 70, 70)
-    } else if value > 50.0 {
-        Color::Rgb(255, 220, 70)
-    } else {
-        Color::Rgb(80, 255, 120)
-    }
-}
-
-fn utilization_background(value: f64) -> Color {
-    if value > 70.0 {
-        Color::Rgb(70, 0, 0)
-    } else if value > 50.0 {
-        Color::Rgb(75, 55, 0)
-    } else {
-        Color::Rgb(0, 45, 0)
-    }
 }
 
 pub fn render_battery_level_chart(
@@ -177,27 +155,13 @@ pub fn render_battery_level_chart(
     current: f64,
     theme: &Theme,
 ) {
-    let line_color = if current < 20.0 {
-        Color::Rgb(255, 70, 70)
-    } else if current < 50.0 {
-        Color::Rgb(255, 220, 70)
-    } else {
-        Color::Rgb(80, 255, 120)
-    };
-    let bg = if current < 20.0 {
-        Color::Rgb(70, 0, 0)
-    } else if current < 50.0 {
-        Color::Rgb(75, 55, 0)
-    } else {
-        Color::Rgb(0, 45, 0)
-    };
     let config = chart::ChartConfig::new(
         &format!("BATTERY LEVEL {:>5.1}%", current),
         0.0,
         100.0,
-        line_color,
+        theme.fg,
     )
-    .with_bg(bg)
+    .with_bg(theme.bg)
     .with_border_color(theme.border_color);
 
     chart::render_chart(f, area, data, &config);
@@ -614,7 +578,7 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
 
 /// Render network sparkline
 pub fn render_network_sparkline(f: &mut Frame, area: Rect, history: &HistoryData, theme: &Theme) {
-    let config = chart::SparklineConfig::new("NET RX", theme.net_rx_color)
+    let config = chart::SparklineConfig::new("NET RX", theme.fg)
         .with_bg(theme.bg)
         .with_border_color(theme.border_color);
     chart::render_sparkline(f, area, &history.network_rx_history, &config);

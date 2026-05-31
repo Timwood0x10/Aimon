@@ -62,16 +62,36 @@ pub fn render_carbon_panel(f: &mut Frame, area: Rect, tracker: &CarbonTracker, t
 pub fn render_efficiency_advisor(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let current_power_w = data.cpu_info.power_metrics.package_w;
     let cpu_usage = data.cpu_info.average_usage;
+    let tracker = &data.carbon_info;
     let top_process = data
         .process_info
         .iter()
         .max_by(|a, b| a.cpu_usage.total_cmp(&b.cpu_usage));
     let advice = build_efficiency_advice(current_power_w, cpu_usage, top_process);
+    let top_energy = tracker.top_processes_by_energy(1).into_iter().next();
 
     let mut lines = vec![
         Line::from(Span::styled(
-            format!("Package {:>6.2}W  CPU {:>5.1}%", current_power_w, cpu_usage),
+            format!(
+                "Idle Score {:>3}/100  Peak {:>5.1}W",
+                tracker.idle_score, tracker.peak_power_w
+            ),
             Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!(
+                "Package {:>6.2}W  CPU {:>5.1}%  Events {}",
+                current_power_w, cpu_usage, tracker.anomaly_count
+            ),
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(Span::styled(
+            top_energy
+                .map(|(name, wh)| {
+                    format!("Top energy: {} {:.4}Wh", truncate_process_name(&name), wh)
+                })
+                .unwrap_or_else(|| "Top energy: collecting process baseline".to_string()),
+            Style::default().fg(theme.fg),
         )),
         Line::from(""),
     ];

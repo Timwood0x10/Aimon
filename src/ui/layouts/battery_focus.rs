@@ -169,7 +169,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     f.render_widget(power_block, areas[3]);
 
     // CPU history as proxy for power trend
-    let chart_config = chart::ChartConfig::new("CPU POWER TREND", 0.0, 100.0, theme.battery_color)
+    let chart_config = chart::ChartConfig::new("CPU POWER TREND", 0.0, 100.0, theme.fg)
         .with_bg(theme.bg)
         .with_border_color(theme.border_color);
     chart::render_chart(f, areas[4], &history.cpu_history, &chart_config);

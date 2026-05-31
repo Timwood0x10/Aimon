@@ -118,7 +118,7 @@ impl DataCollector {
 
         // battery (separate borrow)
         let battery_info = self.battery_collector.get_battery_info().await;
-        self.record_carbon_sample(total_power);
+        self.record_carbon_sample(total_power, cpu_info.average_usage, &process_info);
         let carbon_info = self.carbon_tracker.clone();
 
         Ok(SystemData {
@@ -143,14 +143,19 @@ impl DataCollector {
         })
     }
 
-    fn record_carbon_sample(&mut self, watts: f64) {
+    fn record_carbon_sample(&mut self, watts: f64, cpu_usage: f32, processes: &[ProcessInfo]) {
         let now = Instant::now();
         let elapsed_secs = self
             .last_carbon_sample
             .map(|last| now.duration_since(last).as_secs_f64())
             .unwrap_or(0.0);
         self.last_carbon_sample = Some(now);
-        self.carbon_tracker.record(watts, elapsed_secs);
+        let process_samples: Vec<(String, f32)> = processes
+            .iter()
+            .map(|process| (process.name.clone(), process.cpu_usage))
+            .collect();
+        self.carbon_tracker
+            .record_with_processes(watts, elapsed_secs, cpu_usage, &process_samples);
     }
 
     fn refresh_realtime_data(&mut self) {

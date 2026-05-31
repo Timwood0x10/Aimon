@@ -164,7 +164,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     f.render_widget(rate_block, areas[4]);
 
     // RX sparkline (large)
-    let rx_config = chart::SparklineConfig::new("NETWORK RX", theme.net_rx_color)
+    let rx_config = chart::SparklineConfig::new("NETWORK RX", theme.fg)
         .with_bg(theme.bg)
         .with_border_color(theme.border_color);
     let rx_data: std::collections::VecDeque<u64> = history

@@ -7,7 +7,7 @@ use ratatui::{
     style::{Color, Style},
     symbols,
     text::Span,
-    widgets::{Axis, Block, Borders, Chart, Dataset, GraphType, Sparkline},
+    widgets::{Axis, Block, Borders, Chart, Dataset, GraphType},
     Frame,
 };
 
@@ -160,19 +160,15 @@ pub fn render_sparkline<T: Into<u64> + Copy>(
     data: &std::collections::VecDeque<T>,
     config: &SparklineConfig,
 ) {
-    let sparkline_data: Vec<u64> = data.iter().map(|&v| v.into()).collect();
+    let converted: std::collections::VecDeque<f64> =
+        data.iter().map(|&value| value.into() as f64).collect();
+    let max = config
+        .max
+        .map(|max| max as f64)
+        .unwrap_or_else(|| converted.iter().copied().fold(0.0_f64, f64::max).max(1.0));
+    let chart_config = ChartConfig::new(&config.title, 0.0, max, config.color)
+        .with_bg(config.bg)
+        .with_border_color(config.border_color);
 
-    let sparkline = Sparkline::default()
-        .block(
-            Block::default()
-                .title(format!(" {} ", config.title))
-                .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Plain)
-                .border_style(Style::default().fg(config.border_color))
-                .style(Style::default().bg(config.bg).fg(config.color)),
-        )
-        .data(&sparkline_data)
-        .style(Style::default().fg(config.color).bg(config.bg));
-
-    f.render_widget(sparkline, area);
+    render_chart(f, area, &converted, &chart_config);
 }

@@ -242,7 +242,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     f.render_widget(fan_block, areas[4]);
 
     // Temperature history chart
-    let chart_config = chart::ChartConfig::new("TEMPERATURE HISTORY", 0.0, 100.0, theme.temp_color)
+    let chart_config = chart::ChartConfig::new("TEMPERATURE HISTORY", 0.0, 100.0, theme.fg)
         .with_bg(theme.bg)
         .with_border_color(theme.border_color);
     chart::render_chart(f, areas[5], &history.temperature_history, &chart_config);

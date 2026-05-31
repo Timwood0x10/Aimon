@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Carbon dioxide equivalent constants
 const CO2_PER_KWH: f64 = 0.5; // kg CO2 per kWh (average grid)
@@ -22,6 +23,10 @@ pub struct CarbonTracker {
     pub carbon_kg: f64,
     /// Number of recordings
     pub recording_count: u64,
+    pub peak_power_w: f64,
+    pub anomaly_count: u64,
+    pub idle_score: u8,
+    pub process_energy_wh: BTreeMap<String, f64>,
 }
 
 impl CarbonTracker {
@@ -31,6 +36,10 @@ impl CarbonTracker {
             total_energy_wh: 0.0,
             carbon_kg: 0.0,
             recording_count: 0,
+            peak_power_w: 0.0,
+            anomaly_count: 0,
+            idle_score: 100,
+            process_energy_wh: BTreeMap::new(),
         }
     }
 
@@ -38,6 +47,16 @@ impl CarbonTracker {
     /// - watts: current power draw in watts
     /// - elapsed_secs: time period in seconds for this measurement
     pub fn record(&mut self, watts: f64, elapsed_secs: f64) {
+        self.record_with_processes(watts, elapsed_secs, 0.0, &[]);
+    }
+
+    pub fn record_with_processes(
+        &mut self,
+        watts: f64,
+        elapsed_secs: f64,
+        cpu_usage: f32,
+        processes: &[(String, f32)],
+    ) {
         if watts <= 0.0 || elapsed_secs <= 0.0 {
             return;
         }
@@ -50,6 +69,43 @@ impl CarbonTracker {
         self.carbon_kg = self.total_energy_wh / 1000.0 * CO2_PER_KWH;
 
         self.recording_count += 1;
+        self.peak_power_w = self.peak_power_w.max(watts);
+        self.idle_score = calculate_idle_score(watts, cpu_usage);
+
+        if is_power_anomaly(watts, cpu_usage) {
+            self.anomaly_count += 1;
+        }
+
+        self.record_process_energy(watts, elapsed_secs, processes);
+    }
+
+    pub fn top_processes_by_energy(&self, limit: usize) -> Vec<(String, f64)> {
+        let mut processes: Vec<(String, f64)> = self
+            .process_energy_wh
+            .iter()
+            .map(|(name, wh)| (name.clone(), *wh))
+            .collect();
+        processes.sort_by(|a, b| b.1.total_cmp(&a.1));
+        processes.truncate(limit);
+        processes
+    }
+
+    fn record_process_energy(
+        &mut self,
+        watts: f64,
+        elapsed_secs: f64,
+        processes: &[(String, f32)],
+    ) {
+        let total_cpu: f32 = processes.iter().map(|(_, cpu)| *cpu).sum();
+        if total_cpu <= 0.0 {
+            return;
+        }
+
+        let energy_wh = watts * elapsed_secs / 3600.0;
+        for (name, cpu) in processes.iter().filter(|(_, cpu)| *cpu > 0.0) {
+            let share = (*cpu / total_cpu).clamp(0.0, 1.0) as f64;
+            *self.process_energy_wh.entry(name.clone()).or_insert(0.0) += energy_wh * share;
+        }
     }
 
     /// Get total energy in kilowatt-hours
@@ -87,7 +143,31 @@ impl CarbonTracker {
         self.total_energy_wh = 0.0;
         self.carbon_kg = 0.0;
         self.recording_count = 0;
+        self.peak_power_w = 0.0;
+        self.anomaly_count = 0;
+        self.idle_score = 100;
+        self.process_energy_wh.clear();
     }
+}
+
+fn is_power_anomaly(watts: f64, cpu_usage: f32) -> bool {
+    (watts >= 18.0 && cpu_usage < 25.0) || watts >= 30.0
+}
+
+fn calculate_idle_score(watts: f64, cpu_usage: f32) -> u8 {
+    let mut score = 100.0;
+
+    if cpu_usage < 25.0 && watts > 8.0 {
+        score -= ((watts - 8.0) * 4.0).min(60.0);
+    }
+    if watts > 25.0 {
+        score -= ((watts - 25.0) * 2.0).min(25.0);
+    }
+    if cpu_usage > 80.0 {
+        score -= 10.0;
+    }
+
+    score.clamp(0.0, 100.0).round() as u8
 }
 
 impl Default for CarbonTracker {
@@ -159,5 +239,25 @@ mod tests {
         // Zero time should not accumulate
         tracker.record(100.0, 0.0);
         assert!((tracker.total_energy_wh).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_efficiency_session_metrics() {
+        let mut tracker = CarbonTracker::new();
+        tracker.record_with_processes(
+            20.0,
+            360.0,
+            10.0,
+            &[("Safari".to_string(), 30.0), ("Xcode".to_string(), 10.0)],
+        );
+
+        assert_eq!(tracker.peak_power_w, 20.0);
+        assert_eq!(tracker.anomaly_count, 1);
+        assert!(tracker.idle_score < 100);
+
+        let top = tracker.top_processes_by_energy(1);
+        assert_eq!(top.len(), 1);
+        assert_eq!(top[0].0, "Safari");
+        assert!(top[0].1 > 0.0);
     }
 }

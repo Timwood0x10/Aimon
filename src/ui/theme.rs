@@ -231,19 +231,20 @@ impl Theme {
     }
 
     fn mactop_accent(border_color: Color) -> Self {
+        let content_color = dim_color(border_color, 0.82);
         Self {
             bg: Color::Black,
-            fg: Color::White,
-            accent: Color::White,
+            fg: content_color,
+            accent: content_color,
             border_color,
-            cpu_color: Color::White,
-            mem_color: Color::White,
-            temp_color: Color::White,
-            net_rx_color: Color::White,
-            net_tx_color: Color::White,
-            battery_color: Color::White,
-            warning_color: Color::White,
-            critical_color: Color::White,
+            cpu_color: content_color,
+            mem_color: content_color,
+            temp_color: content_color,
+            net_rx_color: content_color,
+            net_tx_color: content_color,
+            battery_color: content_color,
+            warning_color: content_color,
+            critical_color: content_color,
         }
     }
 
@@ -425,6 +426,24 @@ fn rotate_color(color: Color, degrees: f32) -> Color {
     )
 }
 
+fn dim_color(color: Color, factor: f32) -> Color {
+    match color {
+        Color::Rgb(r, g, b) => Color::Rgb(
+            ((r as f32 * factor).round() as u8).max(1),
+            ((g as f32 * factor).round() as u8).max(1),
+            ((b as f32 * factor).round() as u8).max(1),
+        ),
+        Color::Red => Color::Rgb(210, 50, 50),
+        Color::Blue => Color::Rgb(70, 130, 210),
+        Color::Yellow => Color::Rgb(210, 180, 50),
+        Color::Magenta => Color::Rgb(200, 70, 200),
+        Color::Cyan => Color::Rgb(70, 200, 200),
+        Color::Green => Color::Rgb(70, 210, 90),
+        Color::White => Color::Rgb(210, 210, 210),
+        other => other,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -483,9 +502,9 @@ mod tests {
         let theme = Theme::mactop_green();
         assert_eq!(theme.name(), "mactop_green");
         assert_eq!(theme.bg, Color::Black);
-        assert_eq!(theme.fg, Color::White);
-        assert_eq!(theme.accent, Color::White);
-        assert_eq!(theme.cpu_color, Color::White);
+        assert_eq!(theme.fg, Color::Rgb(1, 209, 1));
+        assert_eq!(theme.accent, Color::Rgb(1, 209, 1));
+        assert_eq!(theme.cpu_color, Color::Rgb(1, 209, 1));
         assert_eq!(theme.border_color, Color::Rgb(0, 255, 0));
     }
 
