@@ -15,6 +15,7 @@ pub struct HistoryData {
     pub network_rx_rate_history: VecDeque<f64>, // bytes per second
     pub network_tx_rate_history: VecDeque<f64>, // bytes per second
     pub temperature_history: VecDeque<f32>,
+    pub battery_history: VecDeque<f32>,
     max_size: usize,
     last_update: Option<Instant>,
     last_network_rx: Option<u64>,
@@ -31,6 +32,7 @@ impl HistoryData {
             network_rx_rate_history: VecDeque::with_capacity(max_size),
             network_tx_rate_history: VecDeque::with_capacity(max_size),
             temperature_history: VecDeque::with_capacity(max_size),
+            battery_history: VecDeque::with_capacity(max_size),
             max_size,
             last_update: None,
             last_network_rx: None,
@@ -47,10 +49,12 @@ impl HistoryData {
         let network_rx_rate_history = &mut self.network_rx_rate_history;
         let network_tx_rate_history = &mut self.network_tx_rate_history;
         let temperature_history = &mut self.temperature_history;
+        let battery_history = &mut self.battery_history;
         let max_size = self.max_size;
 
         Self::push_capped_static(cpu_history, max_size, data.cpu_info.average_usage);
         Self::push_capped_static(memory_history, max_size, data.memory_info.usage_percentage);
+        Self::push_capped_static(battery_history, max_size, data.battery_info.percentage);
 
         let total_rx: u64 = data.network_info.iter().map(|n| n.bytes_received).sum();
         let total_tx: u64 = data.network_info.iter().map(|n| n.bytes_transmitted).sum();

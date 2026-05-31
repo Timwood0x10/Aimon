@@ -2,21 +2,25 @@
 //! Tracks pseudo-terminal (ptmx) usage across the system
 
 use std::collections::HashMap;
-use std::process::Command;
+use std::time::Duration;
 
 use crate::types::{TerminalInfo, TerminalProcess};
 
 /// Collect terminal/PTMX information using lsof
-pub fn collect_terminal_info() -> TerminalInfo {
-    // Run lsof to get ptmx information
-    let output = Command::new("lsof").args(["-c", "ptmx"]).output();
+pub async fn collect_terminal_info() -> TerminalInfo {
+    let output = tokio::time::timeout(
+        Duration::from_millis(800),
+        tokio::process::Command::new("lsof")
+            .args(["-nP", "/dev/ttys*", "/dev/ptmx"])
+            .output(),
+    )
+    .await;
 
     match output {
-        Ok(output) if output.status.success() => {
+        Ok(Ok(output)) if output.status.success() => {
             parse_lsof_output(&String::from_utf8_lossy(&output.stdout))
         }
         _ => {
-            // Fallback: try basic count
             let count = count_ptmx_basic();
             TerminalInfo {
                 total_ptmx_count: count,
@@ -88,15 +92,14 @@ fn parse_lsof_output(output: &str) -> TerminalInfo {
 }
 
 fn count_ptmx_basic() -> u32 {
-    // Simple fallback: just count lines with ptmx
-    let output = Command::new("lsof").args(["|", "grep", "ptmx"]).output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            String::from_utf8_lossy(&output.stdout).lines().count() as u32
-        }
-        _ => 0,
-    }
+    std::fs::read_dir("/dev")
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with("ttys"))
+                .count() as u32
+        })
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -111,10 +114,10 @@ mod tests {
         assert!(info.terminal_processes.is_empty());
     }
 
-    #[test]
-    fn test_collect_terminal_info() {
+    #[tokio::test]
+    async fn test_collect_terminal_info() {
         // This test will only pass on macOS/Linux systems
-        let info = collect_terminal_info();
+        let info = collect_terminal_info().await;
         // Should not panic and return valid data
         println!("Terminal info: {:?}", info);
     }

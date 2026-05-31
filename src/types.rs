@@ -1,3 +1,4 @@
+use crate::carbon::tracker::CarbonTracker;
 use serde::Serialize;
 use std::time::Instant;
 use sysinfo::Pid;
@@ -364,6 +365,7 @@ pub struct SystemData {
     pub performance_metrics: PerformanceMetrics,
     pub system_health: SystemHealthInfo,
     pub terminal_info: TerminalInfo,
+    pub carbon_info: CarbonTracker,
     #[serde(skip)]
     pub timestamp: Instant,
 }

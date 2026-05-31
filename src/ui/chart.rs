@@ -17,6 +17,8 @@ pub struct ChartConfig {
     pub min: f64,
     pub max: f64,
     pub color: Color,
+    pub bg: Color,
+    pub border_color: Color,
     pub title: String,
 }
 
@@ -25,6 +27,8 @@ pub struct ChartConfig {
 pub struct SparklineConfig {
     pub title: String,
     pub color: Color,
+    pub bg: Color,
+    pub border_color: Color,
     pub max: Option<u64>,
 }
 
@@ -34,8 +38,20 @@ impl ChartConfig {
             min,
             max,
             color,
+            bg: Color::Black,
+            border_color: color,
             title: title.to_string(),
         }
+    }
+
+    pub fn with_bg(mut self, bg: Color) -> Self {
+        self.bg = bg;
+        self
+    }
+
+    pub fn with_border_color(mut self, border_color: Color) -> Self {
+        self.border_color = border_color;
+        self
     }
 }
 
@@ -44,6 +60,8 @@ impl SparklineConfig {
         Self {
             title: title.to_string(),
             color,
+            bg: Color::Black,
+            border_color: color,
             max: None,
         }
     }
@@ -52,8 +70,20 @@ impl SparklineConfig {
         Self {
             title: title.to_string(),
             color,
+            bg: Color::Black,
+            border_color: color,
             max: Some(max),
         }
+    }
+
+    pub fn with_bg(mut self, bg: Color) -> Self {
+        self.bg = bg;
+        self
+    }
+
+    pub fn with_border_color(mut self, border_color: Color) -> Self {
+        self.border_color = border_color;
+        self
     }
 }
 
@@ -74,22 +104,19 @@ pub fn render_chart<T: Into<f64> + Copy>(
         .name(&config.title)
         .marker(symbols::Marker::Braille)
         .graph_type(GraphType::Line)
-        .style(Style::default().fg(config.color))
+        .style(Style::default().fg(config.color).bg(config.bg))
         .data(&points)];
 
     let chart = Chart::new(datasets)
         .block(
             Block::default()
-                .title(format!(" ◈ {} ", config.title))
+                .title(format!(" {} ", config.title))
                 .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(
-                    Style::default()
-                        .fg(config.color)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .style(Style::default().bg(Color::Rgb(30, 30, 30)).fg(config.color)),
+                .border_type(ratatui::widgets::BorderType::Plain)
+                .border_style(Style::default().fg(config.border_color))
+                .style(Style::default().bg(config.bg).fg(config.color)),
         )
+        .style(Style::default().bg(config.bg).fg(config.color))
         .x_axis(
             Axis::default()
                 .bounds([0.0, data.len().max(1) as f64])
@@ -138,18 +165,14 @@ pub fn render_sparkline<T: Into<u64> + Copy>(
     let sparkline = Sparkline::default()
         .block(
             Block::default()
-                .title(format!(" ◈ {} ", config.title))
+                .title(format!(" {} ", config.title))
                 .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(
-                    Style::default()
-                        .fg(config.color)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .style(Style::default().bg(Color::Rgb(30, 30, 30)).fg(config.color)),
+                .border_type(ratatui::widgets::BorderType::Plain)
+                .border_style(Style::default().fg(config.border_color))
+                .style(Style::default().bg(config.bg).fg(config.color)),
         )
         .data(&sparkline_data)
-        .style(Style::default().fg(config.color).bg(Color::Rgb(25, 25, 25)));
+        .style(Style::default().fg(config.color).bg(config.bg));
 
     f.render_widget(sparkline, area);
 }

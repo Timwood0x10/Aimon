@@ -24,33 +24,16 @@ pub async fn collect_thermal_info() -> ThermalInfo {
     // Check for thermal throttling via CPU frequency scaling
     thermal_info.thermal_throttling = thermal_info.thermal_pressure > 50;
 
-    // Get fan speeds from powermetrics if available (with timeout to prevent hangs)
-    let power_result = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
+    if let Ok(Ok(output)) = tokio::time::timeout(
+        std::time::Duration::from_millis(900),
         tokio::process::Command::new("powermetrics")
-            .arg("--samplers")
-            .arg("smc")
-            .arg("-n")
-            .arg("1")
-            .arg("--show-initial-usage")
+            .args(["--samplers", "smc", "-n", "1", "--show-initial-usage"])
             .output(),
     )
-    .await;
-    if let Ok(Ok(output)) = power_result {
+    .await
+    {
         if let Ok(power_str) = String::from_utf8(output.stdout) {
-            let mut fan_speeds = Vec::new();
-            for line in power_str.lines() {
-                if line.contains("Fan") && line.contains("RPM") {
-                    if let Some(rpm_str) = line.split_whitespace().find(|s| s.ends_with("RPM")) {
-                        if let Ok(rpm) = rpm_str.trim_end_matches("RPM").parse::<u32>() {
-                            fan_speeds.push(rpm);
-                        }
-                    }
-                }
-            }
-            if !fan_speeds.is_empty() {
-                thermal_info.fan_speeds = fan_speeds;
-            }
+            thermal_info.fan_speeds = parse_fan_speeds(&power_str);
         }
     }
 
@@ -64,4 +47,19 @@ pub async fn collect_thermal_info() -> ThermalInfo {
     };
 
     thermal_info
+}
+
+fn parse_fan_speeds(output: &str) -> Vec<u32> {
+    output
+        .lines()
+        .filter(|line| line.to_ascii_lowercase().contains("fan"))
+        .filter_map(|line| {
+            line.split_whitespace().find_map(|part| {
+                part.trim_end_matches("RPM")
+                    .trim_end_matches("rpm")
+                    .parse::<u32>()
+                    .ok()
+            })
+        })
+        .collect()
 }

@@ -16,9 +16,10 @@ pub mod thermal;
 pub mod thunderbolt;
 
 use crate::battery_collector::FastBatteryCollector;
+use crate::carbon::tracker::CarbonTracker;
 use crate::types::*;
 use std::time::{Duration, Instant};
-use sysinfo::{Components, Networks, System};
+use sysinfo::{Components, CpuRefreshKind, Networks, ProcessRefreshKind, System};
 
 /// Main data collector that coordinates all sub-collectors
 pub struct DataCollector {
@@ -27,8 +28,12 @@ pub struct DataCollector {
     components: Components,
     last_powermetrics: Option<Instant>,
     cached_cpu_metrics: Option<CPUMetrics>,
+    cached_powermetrics_output: Option<String>,
     powermetrics_cache_duration: Duration,
     battery_collector: FastBatteryCollector,
+    cached_system_info: Option<SystemInfo>,
+    carbon_tracker: CarbonTracker,
+    last_carbon_sample: Option<Instant>,
 }
 
 impl Default for DataCollector {
@@ -45,8 +50,12 @@ impl DataCollector {
             components: Components::new_with_refreshed_list(),
             last_powermetrics: None,
             cached_cpu_metrics: None,
+            cached_powermetrics_output: None,
             powermetrics_cache_duration: Duration::from_secs(2),
             battery_collector: FastBatteryCollector::new(),
+            cached_system_info: None,
+            carbon_tracker: CarbonTracker::new(),
+            last_carbon_sample: None,
         }
     }
 
@@ -58,39 +67,59 @@ impl DataCollector {
             components: Components::new(),
             last_powermetrics: None,
             cached_cpu_metrics: None,
+            cached_powermetrics_output: None,
             powermetrics_cache_duration: Duration::from_secs(1),
             battery_collector: FastBatteryCollector::new(),
+            cached_system_info: None,
+            carbon_tracker: CarbonTracker::new(),
+            last_carbon_sample: None,
         }
     }
 
     /// Collect all system data
+    /// Optimized: CPU + parallel collectors run concurrently via tokio::select!
+    /// CPU usage is instant (sysinfo), powermetrics uses cache for speed.
     pub async fn collect_all_data(&mut self) -> Result<SystemData, Box<dyn std::error::Error>> {
-        // Refresh system data
-        self.system.refresh_all();
-        self.system.refresh_processes();
-        self.networks.refresh();
-        self.components.refresh();
+        self.refresh_realtime_data();
 
+        // ── Sync collectors (fast, no I/O, run instantly) ──────────────
         let system_info = self.collect_system_info();
-        let cpu_info = self.collect_cpu_info().await?;
-        let gpu_info = gpu::collect_gpu_info().await;
-        let ane_info = self.collect_ane_info(&cpu_info);
-        let dram_info = self.collect_dram_info(&cpu_info);
-        let thunderbolt_info = thunderbolt::collect_thunderbolt_info().await;
-        let disk_io_info = disk_io::collect_disk_io_info().await;
         let memory_info = self.collect_memory_info();
         let network_info = self.collect_network_info();
         let temperature_info = self.collect_temperature_info();
         let process_info = self.collect_process_info();
+        let terminal_info = terminal::collect_terminal_info().await;
+
+        // ── CPU first (uses &mut self, must complete before other self methods) ──
+        // Speed: powermetrics uses cache after first run, so this is fast (~1ms)
+        let cpu_info = self.collect_cpu_info().await?;
+        let ane_info = self.collect_ane_info(&cpu_info);
+        let dram_info = self.collect_dram_info(&cpu_info);
         let total_power = cpu_info.power_metrics.package_w;
 
+        // ── Parallel async collectors ─────────────────────────────────
+        let (
+            mut gpu_info,
+            thunderbolt_info,
+            disk_io_info,
+            thermal_info,
+            performance_metrics,
+            system_health,
+        ) = tokio::join!(
+            gpu::collect_gpu_info_from_powermetrics(self.cached_powermetrics_output.as_deref()),
+            thunderbolt::collect_thunderbolt_info(),
+            disk_io::collect_disk_io_info(),
+            self.collect_thermal_info(),
+            self.collect_performance_metrics(&cpu_info, total_power),
+            self.collect_system_health(),
+        );
+
+        gpu::complete_static_gpu_info(&mut gpu_info).await;
+
+        // battery (separate borrow)
         let battery_info = self.battery_collector.get_battery_info().await;
-        let thermal_info = self.collect_thermal_info().await;
-        let performance_metrics = self
-            .collect_performance_metrics(&cpu_info, total_power)
-            .await;
-        let system_health = self.collect_system_health().await;
-        let terminal_info = terminal::collect_terminal_info();
+        self.record_carbon_sample(total_power);
+        let carbon_info = self.carbon_tracker.clone();
 
         Ok(SystemData {
             system_info,
@@ -109,11 +138,50 @@ impl DataCollector {
             performance_metrics,
             system_health,
             terminal_info,
+            carbon_info,
             timestamp: Instant::now(),
         })
     }
 
-    fn collect_system_info(&self) -> SystemInfo {
+    fn record_carbon_sample(&mut self, watts: f64) {
+        let now = Instant::now();
+        let elapsed_secs = self
+            .last_carbon_sample
+            .map(|last| now.duration_since(last).as_secs_f64())
+            .unwrap_or(0.0);
+        self.last_carbon_sample = Some(now);
+        self.carbon_tracker.record(watts, elapsed_secs);
+    }
+
+    fn refresh_realtime_data(&mut self) {
+        self.system
+            .refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage().with_frequency());
+        self.system.refresh_memory();
+        self.system.refresh_processes_specifics(
+            ProcessRefreshKind::new()
+                .with_cpu()
+                .with_memory()
+                .with_disk_usage(),
+        );
+
+        if self.networks.is_empty() {
+            self.networks.refresh_list();
+        } else {
+            self.networks.refresh();
+        }
+
+        if self.components.list().is_empty() {
+            self.components.refresh_list();
+        } else {
+            self.components.refresh();
+        }
+    }
+
+    fn collect_system_info(&mut self) -> SystemInfo {
+        if let Some(system_info) = &self.cached_system_info {
+            return system_info.clone();
+        }
+
         let cpu_brand = self
             .system
             .cpus()
@@ -130,7 +198,7 @@ impl DataCollector {
         // Extract chip name from brand string
         let chip_name = extract_chip_name(&cpu_brand);
 
-        SystemInfo {
+        let system_info = SystemInfo {
             name: System::name().unwrap_or_else(|| "Unknown".to_string()),
             kernel_version: System::kernel_version().unwrap_or_else(|| "Unknown".to_string()),
             os_version: System::os_version().unwrap_or_else(|| "Unknown".to_string()),
@@ -142,7 +210,9 @@ impl DataCollector {
             p_core_count,
             gpu_core_count,
             chip_name,
-        }
+        };
+        self.cached_system_info = Some(system_info.clone());
+        system_info
     }
 
     /// Collect ANE info from CPU power metrics
@@ -173,6 +243,7 @@ impl DataCollector {
             &self.system,
             &mut self.last_powermetrics,
             &mut self.cached_cpu_metrics,
+            &mut self.cached_powermetrics_output,
             self.powermetrics_cache_duration,
         )
         .await

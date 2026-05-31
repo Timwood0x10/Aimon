@@ -156,6 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let system_data = Arc::clone(&system_data);
         let history = Arc::clone(&history);
         let data_updated = Arc::clone(&data_updated);
+        let runtime_handle = tokio::runtime::Handle::current();
         let refresh_ms = if config.refresh_rate_ms > 0 {
             config.refresh_rate_ms
         } else {
@@ -164,13 +165,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let refresh_duration = Duration::from_millis(refresh_ms);
 
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async move {
+            runtime_handle.block_on(async move {
                 let mut collector = DataCollector::new_fast();
                 let mut tick = interval(refresh_duration);
-                tick.tick().await; // skip the immediate first tick
                 loop {
-                    tick.tick().await;
                     match collector.collect_all_data().await {
                         Ok(new_data) => {
                             {
@@ -188,6 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             error!("Data collection error: {}", e);
                         }
                     }
+                    tick.tick().await;
                 }
             })
         })
@@ -293,7 +292,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let current_index = themes.iter().position(|&t| t == config.display.theme).unwrap_or(0);
                         let next_index = (current_index + 1) % themes.len();
                         config.display.theme = themes[next_index].to_string();
-                        ui = UI::with_theme_and_layout(&config.display.theme, ui.current_layout())?;
+                        ui.set_theme(&config.display.theme);
                         info!("Theme changed to: {}", config.display.theme);
                         true
                     }
@@ -410,6 +409,7 @@ fn create_placeholder_data() -> SystemData {
         performance_metrics: PerformanceMetrics::default(),
         system_health: SystemHealthInfo::default(),
         terminal_info: TerminalInfo::default(),
+        carbon_info: system_alert::carbon::tracker::CarbonTracker::default(),
         timestamp: Instant::now(),
     }
 }

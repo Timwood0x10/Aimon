@@ -13,6 +13,7 @@ pub async fn collect_cpu_info(
     system: &System,
     last_powermetrics: &mut Option<Instant>,
     cached_cpu_metrics: &mut Option<CPUMetrics>,
+    cached_powermetrics_output: &mut Option<String>,
     powermetrics_cache_duration: Duration,
 ) -> Result<CpuInfo, Box<dyn std::error::Error>> {
     let cpu_usages: Vec<f32> = system.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
@@ -23,14 +24,40 @@ pub async fn collect_cpu_info(
         0.0
     };
 
-    let power_metrics = if let Some(last_time) = last_powermetrics {
-        if last_time.elapsed() < powermetrics_cache_duration {
-            cached_cpu_metrics.clone().unwrap_or_default()
-        } else {
-            fetch_fresh_powermetrics(system, last_powermetrics, cached_cpu_metrics).await?
-        }
+    // Fast path: use cached powermetrics if available and not expired
+    // Slow path: only fetch fresh powermetrics if cache is empty or expired
+    let cache_expired = match last_powermetrics {
+        Some(t) => t.elapsed() >= powermetrics_cache_duration,
+        None => true,
+    };
+
+    let power_metrics = if !cache_expired {
+        // Cache hit — use cached data (instant, no I/O)
+        cached_cpu_metrics.clone().unwrap_or_default()
     } else {
-        fetch_fresh_powermetrics(system, last_powermetrics, cached_cpu_metrics).await?
+        // Cache expired or missing — try to refresh
+        match fetch_fresh_powermetrics(
+            system,
+            last_powermetrics,
+            cached_cpu_metrics,
+            cached_powermetrics_output,
+        )
+        .await
+        {
+            Ok(m) => m,
+            Err(e) => {
+                log::warn!("Powermetrics failed, using fallback: {}", e);
+                // If we have stale cache, use it; otherwise compute fallback
+                if let Some(stale) = cached_cpu_metrics.clone() {
+                    stale
+                } else {
+                    let fallback = get_fallback_cpu_metrics(system);
+                    *cached_cpu_metrics = Some(fallback.clone());
+                    *last_powermetrics = Some(Instant::now());
+                    fallback
+                }
+            }
+        }
     };
 
     Ok(CpuInfo {
@@ -45,11 +72,13 @@ async fn fetch_fresh_powermetrics(
     system: &System,
     last_powermetrics: &mut Option<Instant>,
     cached_cpu_metrics: &mut Option<CPUMetrics>,
+    cached_powermetrics_output: &mut Option<String>,
 ) -> Result<CPUMetrics, Box<dyn std::error::Error>> {
     match get_powermetrics_output().await {
         Ok(output) => {
-            let metrics = parse_cpu_metrics(output).await?;
+            let metrics = parse_cpu_metrics(output.clone()).await?;
             *cached_cpu_metrics = Some(metrics.clone());
+            *cached_powermetrics_output = Some(output);
             *last_powermetrics = Some(Instant::now());
             Ok(metrics)
         }

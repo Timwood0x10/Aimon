@@ -20,21 +20,25 @@ fn base_style(theme: &Theme) -> Style {
     Style::default().fg(theme.fg).bg(theme.bg)
 }
 
+fn panel_block(title: &str, _color: Color, theme: &Theme) -> Block<'static> {
+    Block::default()
+        .title(format!(" {title} "))
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Plain)
+        .border_style(Style::default().fg(theme.border_color))
+        .style(Style::default().bg(theme.bg).fg(theme.fg))
+}
+
 /// Render header with system info
 pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let header_line = Line::from(vec![
         Span::styled(
-            " ◆ SYSTEM ALERT ",
-            Style::default()
-                .fg(theme.bg)
-                .bg(theme.accent)
-                .add_modifier(Modifier::BOLD),
+            " MACTOP++ ",
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!(" {}{}", " ", data.system_info.host_name),
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!("{}{}", " │ ", data.system_info.os_version),
@@ -56,12 +60,8 @@ pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Double)
-                .border_style(
-                    Style::default()
-                        .fg(theme.accent)
-                        .add_modifier(Modifier::BOLD),
-                )
+                .border_type(ratatui::widgets::BorderType::Plain)
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
 
@@ -79,18 +79,11 @@ pub fn render_cpu_gauge(f: &mut Frame, area: Rect, usage: f32, theme: &Theme) {
     };
 
     let gauge = Gauge::default()
-        .block(
-            Block::default()
-                .title(format!(" ◈ CPU {:.1}% ", usage))
-                .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-                .style(Style::default().bg(theme.bg).fg(theme.fg)),
-        )
+        .block(panel_block(&format!("CPU {:.1}%", usage), color, theme))
         .gauge_style(
             Style::default()
                 .fg(color)
-                .bg(Color::Black)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         )
         .ratio(usage as f64 / 100.0)
@@ -98,7 +91,7 @@ pub fn render_cpu_gauge(f: &mut Frame, area: Rect, usage: f32, theme: &Theme) {
             format!("{:.1}%", usage),
             Style::default()
                 .fg(Color::White)
-                .bg(color)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         ));
 
@@ -116,18 +109,11 @@ pub fn render_mem_gauge(f: &mut Frame, area: Rect, usage: u16, theme: &Theme) {
     };
 
     let gauge = Gauge::default()
-        .block(
-            Block::default()
-                .title(format!(" ◈ MEMORY {}% ", usage))
-                .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-                .style(Style::default().bg(theme.bg).fg(theme.fg)),
-        )
+        .block(panel_block(&format!("MEMORY {}%", usage), color, theme))
         .gauge_style(
             Style::default()
                 .fg(color)
-                .bg(Color::Black)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         )
         .ratio(usage as f64 / 100.0)
@@ -135,11 +121,86 @@ pub fn render_mem_gauge(f: &mut Frame, area: Rect, usage: u16, theme: &Theme) {
             format!("{}%", usage),
             Style::default()
                 .fg(Color::White)
-                .bg(color)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         ));
 
     f.render_widget(gauge, area);
+}
+
+pub fn render_utilization_history_chart<T: Into<f64> + Copy>(
+    f: &mut Frame,
+    area: Rect,
+    title: &str,
+    data: &std::collections::VecDeque<T>,
+    current: f64,
+    theme: &Theme,
+) {
+    let bg = utilization_background(current);
+    let line_color = utilization_line_color(current);
+    let config = chart::ChartConfig::new(
+        &format!("{} {:>5.1}%", title, current),
+        0.0,
+        100.0,
+        line_color,
+    )
+    .with_bg(bg)
+    .with_border_color(theme.border_color);
+
+    chart::render_chart(f, area, data, &config);
+}
+
+fn utilization_line_color(value: f64) -> Color {
+    if value > 70.0 {
+        Color::Rgb(255, 70, 70)
+    } else if value > 50.0 {
+        Color::Rgb(255, 220, 70)
+    } else {
+        Color::Rgb(80, 255, 120)
+    }
+}
+
+fn utilization_background(value: f64) -> Color {
+    if value > 70.0 {
+        Color::Rgb(70, 0, 0)
+    } else if value > 50.0 {
+        Color::Rgb(75, 55, 0)
+    } else {
+        Color::Rgb(0, 45, 0)
+    }
+}
+
+pub fn render_battery_level_chart(
+    f: &mut Frame,
+    area: Rect,
+    data: &std::collections::VecDeque<f32>,
+    current: f64,
+    theme: &Theme,
+) {
+    let line_color = if current < 20.0 {
+        Color::Rgb(255, 70, 70)
+    } else if current < 50.0 {
+        Color::Rgb(255, 220, 70)
+    } else {
+        Color::Rgb(80, 255, 120)
+    };
+    let bg = if current < 20.0 {
+        Color::Rgb(70, 0, 0)
+    } else if current < 50.0 {
+        Color::Rgb(75, 55, 0)
+    } else {
+        Color::Rgb(0, 45, 0)
+    };
+    let config = chart::ChartConfig::new(
+        &format!("BATTERY LEVEL {:>5.1}%", current),
+        0.0,
+        100.0,
+        line_color,
+    )
+    .with_bg(bg)
+    .with_border_color(theme.border_color);
+
+    chart::render_chart(f, area, data, &config);
 }
 
 /// Render battery statistics panel
@@ -181,7 +242,7 @@ pub fn render_battery_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.battery_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -222,7 +283,7 @@ pub fn render_power_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.accent)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -239,7 +300,7 @@ pub fn render_process_list(
     config: &Config,
     theme: &Theme,
 ) {
-    // Use indices to avoid cloning the entire process list on every render
+    let visible_rows = area.height.saturating_sub(3).max(1) as usize;
     let mut indices: Vec<usize> = (0..data.process_info.len()).collect();
 
     // Sort by configured criteria
@@ -272,8 +333,7 @@ pub fn render_process_list(
         }
     }
 
-    // Only show top 8 processes
-    indices.truncate(8);
+    indices.truncate(visible_rows);
 
     let header = Line::from(vec![
         Span::styled(
@@ -330,18 +390,13 @@ pub fn render_process_list(
         all_lines.push(line);
     }
 
-    let block = Paragraph::new(all_lines).style(base_style(theme)).block(
-        Block::default()
-            .title(" ◈ PROCESSES ".to_string())
-            .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(
-                Style::default()
-                    .fg(Color::Gray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .style(Style::default().bg(theme.bg)),
-    );
+    let block = Paragraph::new(all_lines)
+        .style(base_style(theme))
+        .block(panel_block(
+            &format!("PROCESSES {:?}", config.process_sort_by),
+            Color::Gray,
+            theme,
+        ));
 
     f.render_widget(block, area);
 }
@@ -377,7 +432,7 @@ pub fn render_network_stats(
             Span::styled(
                 "↓ ",
                 Style::default()
-                    .fg(theme.net_rx_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
@@ -431,7 +486,7 @@ pub fn render_network_stats(
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.net_rx_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -481,7 +536,12 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         Line::from(vec![
             Span::styled("Fans: ", Style::default().fg(Color::Gray)),
             Span::styled(
-                format!("{} RPM", thermal.fan_speeds.iter().max().unwrap_or(&0)),
+                thermal
+                    .fan_speeds
+                    .iter()
+                    .max()
+                    .map(|rpm| format!("{} RPM", rpm))
+                    .unwrap_or_else(|| "Unavailable".to_string()),
                 Style::default().fg(theme.fg),
             ),
         ]),
@@ -494,7 +554,7 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.temp_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -504,16 +564,8 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
 }
 
 /// Get color based on CPU usage percentage
-fn get_cpu_usage_color(usage: f32, theme: &Theme) -> Color {
-    if usage > 90.0 {
-        theme.critical_color
-    } else if usage > 70.0 {
-        theme.warning_color
-    } else if usage > 50.0 {
-        Color::Yellow
-    } else {
-        Color::Green
-    }
+fn get_cpu_usage_color(_usage: f32, theme: &Theme) -> Color {
+    theme.fg
 }
 
 /// Render CPU core usage bar chart with gradient bars
@@ -551,7 +603,7 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.cpu_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -562,7 +614,9 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
 
 /// Render network sparkline
 pub fn render_network_sparkline(f: &mut Frame, area: Rect, history: &HistoryData, theme: &Theme) {
-    let config = chart::SparklineConfig::new("NET RX", theme.net_rx_color);
+    let config = chart::SparklineConfig::new("NET RX", theme.net_rx_color)
+        .with_bg(theme.bg)
+        .with_border_color(theme.border_color);
     chart::render_sparkline(f, area, &history.network_rx_history, &config);
 }
 
@@ -626,7 +680,7 @@ pub fn render_compact_process_list(
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(Color::Gray)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -707,9 +761,13 @@ pub fn render_help_overlay(f: &mut Frame, theme: &Theme) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(vec![
-            Span::styled("  1-7         ", Style::default().fg(theme.accent)),
+            Span::styled("  0           ", Style::default().fg(theme.accent)),
+            Span::styled("Startup summary", Style::default().fg(theme.fg)),
+        ]),
+        Line::from(vec![
+            Span::styled("  1-9         ", Style::default().fg(theme.accent)),
             Span::styled(
-                "Jump to layout (Full/Minimal/Compact/Battery/GPU/Network/Health)",
+                "Jump to layout (Full/Advanced/Minimal/Compact/Battery/GPU/Network/Health/Thermals)",
                 Style::default().fg(theme.fg),
             ),
         ]),
@@ -765,7 +823,7 @@ pub fn render_help_overlay(f: &mut Frame, theme: &Theme) {
                 .borders(Borders::ALL)
                 .border_style(
                     Style::default()
-                        .fg(theme.accent)
+                        .fg(theme.border_color)
                         .add_modifier(Modifier::BOLD),
                 ),
         )
@@ -833,7 +891,7 @@ pub fn render_terminal_info(f: &mut Frame, area: Rect, data: &SystemData, theme:
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.accent)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -858,13 +916,19 @@ pub fn render_status_bar(
         Span::styled(
             &left,
             Style::default()
-                .fg(theme.bg)
-                .bg(theme.accent)
+                .fg(theme.fg)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(center, Style::default().fg(theme.fg).bg(theme.bg)),
         Span::raw(" ".to_string()),
-        Span::styled(&right, Style::default().fg(theme.bg).bg(theme.cpu_color)),
+        Span::styled(
+            &right,
+            Style::default()
+                .fg(theme.fg)
+                .bg(theme.bg)
+                .add_modifier(Modifier::BOLD),
+        ),
     ]))
     .style(Style::default().bg(theme.bg));
 
@@ -979,7 +1043,7 @@ pub fn render_detailed_temperatures(f: &mut Frame, area: Rect, data: &SystemData
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.temp_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -1038,7 +1102,7 @@ pub fn render_disk_io(f: &mut Frame, area: Rect, data: &SystemData, theme: &Them
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.mem_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -1065,18 +1129,11 @@ pub fn render_gpu_gauge(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
     };
 
     let gauge = Gauge::default()
-        .block(
-            Block::default()
-                .title(format!(" ◈ GPU {} ", label))
-                .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-                .style(Style::default().bg(theme.bg).fg(theme.fg)),
-        )
+        .block(panel_block(&format!("GPU {label}"), color, theme))
         .gauge_style(
             Style::default()
                 .fg(color)
-                .bg(Color::Black)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         )
         .ratio(gpu.usage_percentage as f64 / 100.0)
@@ -1084,7 +1141,7 @@ pub fn render_gpu_gauge(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
             label,
             Style::default()
                 .fg(Color::White)
-                .bg(color)
+                .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         ));
 
@@ -1139,7 +1196,11 @@ pub fn render_gpu_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
             .title(" ◈ GPU ")
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
+            .border_style(
+                Style::default()
+                    .fg(theme.border_color)
+                    .add_modifier(Modifier::BOLD),
+            )
             .style(Style::default().bg(theme.bg)),
     );
 
@@ -1170,14 +1231,9 @@ pub fn render_ane_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
         )),
     ];
 
-    let block = Paragraph::new(lines).style(base_style(theme)).block(
-        Block::default()
-            .title(" ◈ ANE ")
-            .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-            .style(Style::default().bg(theme.bg)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(panel_block("ANE", color, theme));
 
     f.render_widget(block, area);
 }
@@ -1226,7 +1282,7 @@ pub fn render_dram_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &T
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.mem_color)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -1256,7 +1312,7 @@ pub fn render_thunderbolt_info(f: &mut Frame, area: Rect, data: &SystemData, the
             lines.push(Line::from(Span::styled(
                 format!("  {} {} - {}", status_icon, bus.name, bus.speed),
                 Style::default()
-                    .fg(theme.accent)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )));
 
@@ -1276,7 +1332,7 @@ pub fn render_thunderbolt_info(f: &mut Frame, area: Rect, data: &SystemData, the
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(theme.accent)
+                    .fg(theme.border_color)
                     .add_modifier(Modifier::BOLD),
             )
             .style(Style::default().bg(theme.bg)),
@@ -1288,7 +1344,6 @@ pub fn render_thunderbolt_info(f: &mut Frame, area: Rect, data: &SystemData, the
 /// Render detailed power breakdown panel
 pub fn render_power_breakdown(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let power = &data.cpu_info.power_metrics;
-    let gpu = &data.gpu_info;
     let dram = &data.dram_info;
 
     // Calculate power bar widths (max 20 chars)
@@ -1347,18 +1402,9 @@ pub fn render_power_breakdown(f: &mut Frame, area: Rect, data: &SystemData, them
         ]),
     ];
 
-    let block = Paragraph::new(lines).style(base_style(theme)).block(
-        Block::default()
-            .title(" ◈ POWER ")
-            .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(
-                Style::default()
-                    .fg(theme.accent)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .style(Style::default().bg(theme.bg)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(panel_block("POWER", theme.accent, theme));
 
     f.render_widget(block, area);
 }
@@ -1402,18 +1448,9 @@ pub fn render_disk_io_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         )),
     ];
 
-    let block = Paragraph::new(lines).style(base_style(theme)).block(
-        Block::default()
-            .title(" ◈ DISK I/O ")
-            .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(
-                Style::default()
-                    .fg(theme.mem_color)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .style(Style::default().bg(theme.bg)),
-    );
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(panel_block("DISK I/O", theme.mem_color, theme));
 
     f.render_widget(block, area);
 }

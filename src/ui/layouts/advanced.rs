@@ -1,14 +1,14 @@
 //! Advanced layout - comprehensive view matching mactop's full feature set
 //! Shows CPU+GPU+ANE+Power+Memory+Network+Disk+Temperature+Fan+Process+Thunderbolt
 
+use crate::carbon::render::{render_carbon_panel, render_efficiency_advisor};
 use crate::config::Config;
 use crate::history::HistoryData;
 use crate::types::SystemData;
 use crate::ui::components;
-use crate::ui::layout;
 use crate::ui::theme::Theme;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     Frame,
 };
 
@@ -44,7 +44,14 @@ pub fn draw(
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main[1]);
 
-    components::render_cpu_gauge(f, row1[0], data.cpu_info.average_usage, theme);
+    components::render_utilization_history_chart(
+        f,
+        row1[0],
+        "CPU UTIL",
+        &history.cpu_history,
+        data.cpu_info.average_usage as f64,
+        theme,
+    );
     components::render_gpu_gauge(f, row1[1], data, theme);
 
     // Row 2: Memory gauge + Power breakdown
@@ -53,8 +60,15 @@ pub fn draw(
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main[2]);
 
-    components::render_mem_gauge(f, row2[0], data.memory_info.usage_percentage, theme);
-    components::render_power_breakdown(f, row2[1], data, theme);
+    components::render_utilization_history_chart(
+        f,
+        row2[0],
+        "MEM UTIL",
+        &history.memory_history,
+        data.memory_info.usage_percentage as f64,
+        theme,
+    );
+    render_efficiency_advisor(f, row2[1], data, theme);
 
     // Row 3: CPU cores + ANE + DRAM
     let row3 = Layout::default()
@@ -95,7 +109,7 @@ pub fn draw(
 
     components::render_network_stats(f, right[0], data, history, theme);
     components::render_disk_io_stats(f, right[1], data, theme);
-    components::render_thunderbolt_info(f, right[2], data, theme);
+    render_carbon_panel(f, right[2], &data.carbon_info, theme);
     components::render_detailed_temperatures(f, right[3], data, theme);
 
     // Status bar

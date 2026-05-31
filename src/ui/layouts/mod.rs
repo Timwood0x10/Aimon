@@ -17,6 +17,8 @@ use std::str::FromStr;
 /// Available layout types for the system monitor
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum LayoutType {
+    /// Startup summary page
+    Startup,
     /// Full comprehensive system overview
     #[default]
     Full,
@@ -42,6 +44,7 @@ impl LayoutType {
     /// Returns all available layout types in display order
     pub fn all() -> &'static [LayoutType] {
         &[
+            LayoutType::Startup,
             LayoutType::Full,
             LayoutType::Advanced,
             LayoutType::Minimal,
@@ -57,6 +60,7 @@ impl LayoutType {
     /// Get the numeric key (1-9) for quick jump
     pub fn key_number(&self) -> u8 {
         match self {
+            LayoutType::Startup => 0,
             LayoutType::Full => 1,
             LayoutType::Advanced => 2,
             LayoutType::Minimal => 3,
@@ -72,6 +76,7 @@ impl LayoutType {
     /// Create from a key number (1-9)
     pub fn from_key_number(n: u8) -> Option<LayoutType> {
         match n {
+            0 => Some(LayoutType::Startup),
             1 => Some(LayoutType::Full),
             2 => Some(LayoutType::Advanced),
             3 => Some(LayoutType::Minimal),
@@ -89,6 +94,7 @@ impl LayoutType {
 impl fmt::Display for LayoutType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            LayoutType::Startup => write!(f, "Startup"),
             LayoutType::Full => write!(f, "Full"),
             LayoutType::Advanced => write!(f, "Advanced"),
             LayoutType::Minimal => write!(f, "Minimal"),
@@ -107,6 +113,7 @@ impl FromStr for LayoutType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "startup" | "start" | "home" => Ok(LayoutType::Startup),
             "full" => Ok(LayoutType::Full),
             "advanced" | "adv" => Ok(LayoutType::Advanced),
             "minimal" | "min" => Ok(LayoutType::Minimal),
@@ -146,11 +153,12 @@ mod tests {
 
     #[test]
     fn test_layout_type_all_count() {
-        assert_eq!(LayoutType::all().len(), 7);
+        assert_eq!(LayoutType::all().len(), 10);
     }
 
     #[test]
     fn test_layout_type_display() {
+        assert_eq!(LayoutType::Startup.to_string(), "Startup");
         assert_eq!(LayoutType::Full.to_string(), "Full");
         assert_eq!(LayoutType::Minimal.to_string(), "Minimal");
         assert_eq!(LayoutType::Compact.to_string(), "Compact");
@@ -162,6 +170,10 @@ mod tests {
 
     #[test]
     fn test_layout_type_from_str() {
+        assert_eq!(
+            LayoutType::from_str("startup").unwrap(),
+            LayoutType::Startup
+        );
         assert_eq!(LayoutType::from_str("full").unwrap(), LayoutType::Full);
         assert_eq!(
             LayoutType::from_str("minimal").unwrap(),
@@ -198,18 +210,16 @@ mod tests {
 
     #[test]
     fn test_layout_type_from_key_number() {
+        assert_eq!(LayoutType::from_key_number(0), Some(LayoutType::Startup));
         assert_eq!(LayoutType::from_key_number(1), Some(LayoutType::Full));
-        assert_eq!(
-            LayoutType::from_key_number(7),
-            Some(LayoutType::SystemHealth)
-        );
-        assert_eq!(LayoutType::from_key_number(0), None);
-        assert_eq!(LayoutType::from_key_number(8), None);
+        assert_eq!(LayoutType::from_key_number(9), Some(LayoutType::Thermals));
+        assert_eq!(LayoutType::from_key_number(10), None);
     }
 
     #[test]
     fn test_layout_type_key_number() {
+        assert_eq!(LayoutType::Startup.key_number(), 0);
         assert_eq!(LayoutType::Full.key_number(), 1);
-        assert_eq!(LayoutType::SystemHealth.key_number(), 7);
+        assert_eq!(LayoutType::SystemHealth.key_number(), 8);
     }
 }

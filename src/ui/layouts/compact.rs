@@ -49,9 +49,23 @@ fn create_compact_grid(area: Rect) -> Vec<Rect> {
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
     let areas = create_compact_grid(f.size());
 
-    // Top row: CPU gauge, Memory gauge, Battery %
-    components::render_cpu_gauge(f, areas[0], data.cpu_info.average_usage, theme);
-    components::render_mem_gauge(f, areas[1], data.memory_info.usage_percentage, theme);
+    // Top row: CPU history, Memory history, Battery %
+    components::render_utilization_history_chart(
+        f,
+        areas[0],
+        "CPU UTIL",
+        &history.cpu_history,
+        data.cpu_info.average_usage as f64,
+        theme,
+    );
+    components::render_utilization_history_chart(
+        f,
+        areas[1],
+        "MEM UTIL",
+        &history.memory_history,
+        data.memory_info.usage_percentage as f64,
+        theme,
+    );
     components::render_battery_stats(f, areas[2], data, theme);
 
     // Bottom row: Network rates, Top 3 processes, Thermal

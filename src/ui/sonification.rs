@@ -174,7 +174,7 @@ pub fn render(f: &mut Frame, area: Rect, data: &SystemData, _active: bool, theme
         Block::default()
             .title(" SONIFICATION ")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent)),
+            .border_style(Style::default().fg(theme.border_color)),
     );
 
     f.render_widget(block, area);
@@ -238,6 +238,7 @@ mod tests {
             system_health: SystemHealthInfo::default(),
             timestamp: Instant::now(),
             terminal_info: TerminalInfo::default(),
+            carbon_info: crate::carbon::tracker::CarbonTracker::default(),
         }
     }
 

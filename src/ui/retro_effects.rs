@@ -139,7 +139,7 @@ pub fn render_bios_post(f: &mut Frame, area: Rect, theme: &Theme) {
         Block::default()
             .title(" POST ")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent)),
+            .border_style(Style::default().fg(theme.border_color)),
     );
 
     f.render_widget(block, area);

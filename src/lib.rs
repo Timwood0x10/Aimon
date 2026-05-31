@@ -1,5 +1,6 @@
 pub mod api;
 pub mod battery_collector;
+pub mod carbon;
 pub mod cli;
 pub mod collectors;
 pub mod config;

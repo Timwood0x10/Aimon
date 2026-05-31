@@ -2,6 +2,7 @@
 //! Collects Thunderbolt bus and device information using system_profiler
 
 use crate::types::{ThunderboltBus, ThunderboltDevice, ThunderboltInfo};
+use std::time::Duration;
 
 /// Collect Thunderbolt information
 pub async fn collect_thunderbolt_info() -> ThunderboltInfo {
@@ -16,10 +17,13 @@ pub async fn collect_thunderbolt_info() -> ThunderboltInfo {
 }
 
 async fn get_thunderbolt_info() -> Result<String, Box<dyn std::error::Error>> {
-    let output = tokio::process::Command::new("system_profiler")
-        .args(["SPThunderboltDataType"])
-        .output()
-        .await?;
+    let output = tokio::time::timeout(
+        Duration::from_secs(2),
+        tokio::process::Command::new("system_profiler")
+            .args(["SPThunderboltDataType"])
+            .output(),
+    )
+    .await??;
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }

@@ -222,6 +222,7 @@ mod tests {
             },
             timestamp: Instant::now(),
             terminal_info: TerminalInfo::default(),
+            carbon_info: crate::carbon::tracker::CarbonTracker::default(),
         }
     }
 

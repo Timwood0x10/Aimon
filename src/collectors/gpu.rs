@@ -1,7 +1,6 @@
 //! GPU data collector
 //! Collects GPU usage, frequency, and core information using IOReport/IOKit
 
-use crate::cli::get_powermetrics_output;
 use crate::types::GpuInfo;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -10,32 +9,36 @@ use regex::Regex;
 pub async fn collect_gpu_info() -> GpuInfo {
     let mut gpu_info = GpuInfo::default();
 
-    // Try to get GPU info from powermetrics
-    match get_powermetrics_output().await {
-        Ok(output) => {
-            parse_gpu_from_powermetrics(&output, &mut gpu_info);
-        }
-        Err(_) => {
-            // Fallback: try system_profiler
-            if let Ok(output) = get_system_profiler_gpu().await {
-                parse_gpu_from_profiler(&output, &mut gpu_info);
-            }
-        }
+    if let Ok(output) = get_system_profiler_gpu().await {
+        parse_gpu_from_profiler(&output, &mut gpu_info);
     }
 
-    // Detect GPU core count from chip model
+    complete_static_gpu_info(&mut gpu_info).await;
+
+    gpu_info
+}
+
+/// Collect dynamic GPU information from already-sampled powermetrics output.
+pub async fn collect_gpu_info_from_powermetrics(output: Option<&str>) -> GpuInfo {
+    let mut gpu_info = GpuInfo::default();
+
+    if let Some(output) = output {
+        parse_gpu_from_powermetrics(output, &mut gpu_info);
+    }
+
+    gpu_info
+}
+
+/// Fill slower/static GPU details without invoking powermetrics again.
+pub async fn complete_static_gpu_info(gpu_info: &mut GpuInfo) {
     if gpu_info.core_count == 0 {
         gpu_info.core_count = detect_gpu_core_count();
     }
 
-    // Calculate TFLOPs
     if gpu_info.freq_mhz > 0 && gpu_info.core_count > 0 {
-        // Approximate: 2 FLOPs per clock per GPU core (FP32)
         gpu_info.tflops =
             (gpu_info.core_count as f64 * gpu_info.freq_mhz as f64 * 1e6 * 2.0) / 1e12;
     }
-
-    gpu_info
 }
 
 /// Parse GPU metrics from powermetrics output

@@ -190,7 +190,7 @@ impl ChipHeatmap {
             Block::default()
                 .title(" CHIP HEATMAP ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.accent)),
+                .border_style(Style::default().fg(theme.border_color)),
         );
 
         f.render_widget(block, area);
@@ -270,6 +270,7 @@ mod tests {
             system_health: SystemHealthInfo::default(),
             timestamp: Instant::now(),
             terminal_info: TerminalInfo::default(),
+            carbon_info: crate::carbon::tracker::CarbonTracker::default(),
         };
 
         // With no temperature data, average should be None

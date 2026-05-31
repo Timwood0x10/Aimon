@@ -65,15 +65,9 @@ impl CarbonTracker {
         let description = if self.carbon_kg < 0.001 {
             "Minimal impact".to_string()
         } else if self.carbon_kg < 0.01 {
-            format!(
-                "Like charging your phone {:.0} times",
-                phone_charges
-            )
+            format!("Like charging your phone {:.0} times", phone_charges)
         } else if self.carbon_kg < 0.1 {
-            format!(
-                "Like a 60W bulb on for {:.1} hours",
-                lightbulb_hours
-            )
+            format!("Like a 60W bulb on for {:.1} hours", lightbulb_hours)
         } else {
             format!(
                 "{:.1} phone charges or {:.1} hours of light",

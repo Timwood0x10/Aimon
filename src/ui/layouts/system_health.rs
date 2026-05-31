@@ -104,7 +104,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Block::default()
                 .title(" SYSTEM UPTIME ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.accent))
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(uptime_block, areas[1]);
@@ -147,7 +147,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Block::default()
                 .title(" LOAD AVERAGES ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.cpu_color))
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(load_block, areas[2]);
@@ -199,7 +199,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Block::default()
                 .title(" TEMPERATURES ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.temp_color))
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(temp_block, areas[3]);
@@ -218,10 +218,16 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         .collect();
 
     let fan_block = Paragraph::new(if fan_lines.is_empty() {
-        vec![Line::from(Span::styled(
-            "No fan data",
-            Style::default().fg(Color::Gray),
-        ))]
+        vec![
+            Line::from(Span::styled(
+                "No fan RPM exposed",
+                Style::default().fg(Color::Gray),
+            )),
+            Line::from(Span::styled(
+                "Fanless Mac or SMC requires sudo",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]
     } else {
         fan_lines
     })
@@ -230,13 +236,15 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         Block::default()
             .title(" FANS ")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.fg))
+            .border_style(Style::default().fg(theme.border_color))
             .style(Style::default().bg(theme.bg)),
     );
     f.render_widget(fan_block, areas[4]);
 
     // Temperature history chart
-    let chart_config = chart::ChartConfig::new("TEMPERATURE HISTORY", 0.0, 100.0, theme.temp_color);
+    let chart_config = chart::ChartConfig::new("TEMPERATURE HISTORY", 0.0, 100.0, theme.temp_color)
+        .with_bg(theme.bg)
+        .with_border_color(theme.border_color);
     chart::render_chart(f, areas[5], &history.temperature_history, &chart_config);
 }
 

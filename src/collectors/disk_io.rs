@@ -2,6 +2,7 @@
 //! Collects disk read/write speeds
 
 use crate::types::DiskIoInfo;
+use std::time::Duration;
 
 /// Collect disk I/O information
 /// Uses iostat command for accurate per-second rates
@@ -9,11 +10,15 @@ pub async fn collect_disk_io_info() -> DiskIoInfo {
     let mut info = DiskIoInfo::default();
 
     // Try iostat for real-time disk I/O
-    if let Ok(output) = tokio::process::Command::new("iostat")
-        .args(["-c", "2", "-w", "1"])
-        .output()
-        .await
-    {
+    let output = tokio::time::timeout(
+        Duration::from_secs(2),
+        tokio::process::Command::new("iostat")
+            .args(["-c", "2", "-w", "1"])
+            .output(),
+    )
+    .await;
+
+    if let Ok(Ok(output)) = output {
         let text = String::from_utf8_lossy(&output.stdout);
         // Parse iostat output for KB/t and tps
         for line in text.lines().skip(2) {

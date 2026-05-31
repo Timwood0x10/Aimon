@@ -16,7 +16,7 @@ pub fn draw(
     f: &mut Frame,
     data: &SystemData,
     history: &HistoryData,
-    config: &Config,
+    _config: &Config,
     theme: &Theme,
 ) {
     let size = f.size();
@@ -38,7 +38,14 @@ pub fn draw(
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main[1]);
 
-    components::render_cpu_gauge(f, row1[0], data.cpu_info.average_usage, theme);
+    components::render_utilization_history_chart(
+        f,
+        row1[0],
+        "CPU UTIL",
+        &history.cpu_history,
+        data.cpu_info.average_usage as f64,
+        theme,
+    );
     components::render_gpu_gauge(f, row1[1], data, theme);
 
     let row2 = Layout::default()

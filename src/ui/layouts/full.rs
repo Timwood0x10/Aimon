@@ -1,6 +1,7 @@
 //! Full layout - comprehensive system overview
 //! Shows all major system metrics in a multi-panel view
 
+use crate::carbon::render::{render_carbon_panel, render_efficiency_advisor};
 use crate::config::Config;
 use crate::history::HistoryData;
 use crate::types::SystemData;
@@ -25,17 +26,33 @@ pub fn draw(
     // Top section: CPU, GPU, Memory, Power
     let top = layout::create_top_stats_layout(main[1]);
 
-    components::render_cpu_gauge(f, top[0], data.cpu_info.average_usage, theme);
+    components::render_utilization_history_chart(
+        f,
+        top[0],
+        "CPU UTIL",
+        &history.cpu_history,
+        data.cpu_info.average_usage as f64,
+        theme,
+    );
     components::render_gpu_gauge(f, top[1], data, theme);
-    components::render_mem_gauge(f, top[2], data.memory_info.usage_percentage, theme);
-    components::render_power_breakdown(f, top[3], data, theme);
+    components::render_utilization_history_chart(
+        f,
+        top[2],
+        "MEM UTIL",
+        &history.memory_history,
+        data.memory_info.usage_percentage as f64,
+        theme,
+    );
+    render_efficiency_advisor(f, top[3], data, theme);
 
     // Middle section: Charts + CPU Cores
     let mid = layout::create_charts_layout(main[2]);
 
     // Left side: CPU history chart
     let chart_config =
-        super::super::chart::ChartConfig::new("CPU HISTORY", 0.0, 100.0, theme.cpu_color);
+        super::super::chart::ChartConfig::new("CPU HISTORY", 0.0, 100.0, theme.cpu_color)
+            .with_bg(theme.bg)
+            .with_border_color(theme.border_color);
     super::super::chart::render_chart(f, mid[0], &history.cpu_history, &chart_config);
 
     // Right side: CPU cores bar chart
@@ -48,7 +65,7 @@ pub fn draw(
     components::render_network_stats(f, bottom[1], data, history, theme);
     components::render_thermal_stats(f, bottom[2], data, theme);
     components::render_disk_io_stats(f, bottom[3], data, theme);
-    components::render_ane_stats(f, bottom[4], data, theme);
+    render_carbon_panel(f, bottom[4], &data.carbon_info, theme);
 
     // Status bar
     let uptime_str = format_uptime(data.system_health.uptime_seconds);

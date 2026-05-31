@@ -9,7 +9,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -58,32 +58,14 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     // Header
     components::render_header(f, areas[0], data, theme);
 
-    // CPU gauge
-    let cpu_usage = data.cpu_info.average_usage;
-    let cpu_color = if cpu_usage > 90.0 {
-        theme.critical_color
-    } else if cpu_usage > 70.0 {
-        theme.warning_color
-    } else {
-        theme.cpu_color
-    };
-    let cpu_gauge = Gauge::default()
-        .block(
-            Block::default()
-                .title(format!(" ◈ CPU {:.1}% ", cpu_usage))
-                .borders(Borders::ALL)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(Style::default().fg(cpu_color).add_modifier(Modifier::BOLD))
-                .style(Style::default().bg(theme.bg).fg(theme.fg)),
-        )
-        .gauge_style(
-            Style::default()
-                .fg(cpu_color)
-                .bg(ratatui::style::Color::Black)
-                .add_modifier(Modifier::BOLD),
-        )
-        .ratio(cpu_usage as f64 / 100.0);
-    f.render_widget(cpu_gauge, areas[1]);
+    components::render_utilization_history_chart(
+        f,
+        areas[1],
+        "CPU UTIL",
+        &history.cpu_history,
+        data.cpu_info.average_usage as f64,
+        theme,
+    );
 
     // GPU gauge
     components::render_gpu_gauge(f, areas[2], data, theme);

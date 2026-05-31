@@ -107,7 +107,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
                 Block::default()
                     .title(format!(" {} ", iface.name))
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(theme.net_rx_color))
+                    .border_style(Style::default().fg(theme.border_color))
                     .style(Style::default().bg(theme.bg)),
             );
         f.render_widget(block, area);
@@ -122,7 +122,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
                 Block::default()
                     .title(" N/A ")
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(theme.fg))
+                    .border_style(Style::default().fg(theme.border_color))
                     .style(Style::default().bg(theme.bg)),
             );
         f.render_widget(block, area);
@@ -158,13 +158,15 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Block::default()
                 .title(" REAL-TIME RATES ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.accent))
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(rate_block, areas[4]);
 
     // RX sparkline (large)
-    let rx_config = chart::SparklineConfig::new("NETWORK RX", theme.net_rx_color);
+    let rx_config = chart::SparklineConfig::new("NETWORK RX", theme.net_rx_color)
+        .with_bg(theme.bg)
+        .with_border_color(theme.border_color);
     let rx_data: std::collections::VecDeque<u64> = history
         .network_rx_rate_history
         .iter()

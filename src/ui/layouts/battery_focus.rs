@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -41,28 +41,15 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     // Header
     components::render_header(f, areas[0], data, theme);
 
-    // Large battery gauge
+    // Large battery history chart
     let batt = &data.battery_info;
-    let batt_color = if batt.percentage < 20.0 {
-        theme.critical_color
-    } else if batt.percentage < 50.0 {
-        theme.warning_color
-    } else {
-        theme.battery_color
-    };
-
-    let gauge = Gauge::default()
-        .block(
-            Block::default()
-                .title(" BATTERY LEVEL ")
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(batt_color))
-                .style(Style::default().bg(theme.bg)),
-        )
-        .gauge_style(Style::default().fg(batt_color).bg(theme.bg))
-        .ratio(batt.percentage as f64 / 100.0)
-        .label(format!("{:.0}%", batt.percentage));
-    f.render_widget(gauge, areas[1]);
+    components::render_battery_level_chart(
+        f,
+        areas[1],
+        &history.battery_history,
+        batt.percentage as f64,
+        theme,
+    );
 
     // Battery details
     let status_icon = if batt.is_charging {
@@ -80,7 +67,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Span::styled("Status: ", Style::default().fg(theme.fg)),
             Span::styled(
                 status_icon,
-                Style::default().fg(batt_color).add_modifier(Modifier::BOLD),
+                Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
@@ -116,7 +103,7 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Block::default()
                 .title(" BATTERY DETAILS ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(batt_color))
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(detail_block, areas[2]);
@@ -176,12 +163,14 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Block::default()
                 .title(" POWER BREAKDOWN ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(theme.accent))
+                .border_style(Style::default().fg(theme.border_color))
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(power_block, areas[3]);
 
     // CPU history as proxy for power trend
-    let chart_config = chart::ChartConfig::new("CPU POWER TREND", 0.0, 100.0, theme.battery_color);
+    let chart_config = chart::ChartConfig::new("CPU POWER TREND", 0.0, 100.0, theme.battery_color)
+        .with_bg(theme.bg)
+        .with_border_color(theme.border_color);
     chart::render_chart(f, areas[4], &history.cpu_history, &chart_config);
 }

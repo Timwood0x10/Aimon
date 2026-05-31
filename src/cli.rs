@@ -186,7 +186,7 @@ pub enum InputEvent {
     ToggleTimeTravel,
     /// Toggle achievements display
     ToggleAchievements,
-    /// Jump to a specific layout by number (1-7)
+    /// Jump to a specific layout by number (0-9)
     JumpToLayout(u8),
     /// Search processes (/)
     SearchProcess,
@@ -197,7 +197,10 @@ pub enum InputEvent {
 pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
     let (tx, rx) = tokio_mpsc::channel(32);
 
-    tokio::spawn(async move {
+    // MUST use std::thread::spawn, NOT tokio::spawn!
+    // stdin.events() is a blocking iterator that would freeze a tokio worker.
+    // blocking_send() doesn't need async runtime scheduling.
+    std::thread::spawn(move || {
         let stdin = std::io::stdin();
 
         for event in stdin.events().flatten() {
@@ -219,7 +222,8 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
                 Event::Key(Key::Char('g')) => Some(InputEvent::GoToTop),
                 Event::Key(Key::Char('G')) => Some(InputEvent::GoToBottom),
 
-                // Quick layout jump (1-7)
+                // Quick layout jump (0-9)
+                Event::Key(Key::Char('0')) => Some(InputEvent::JumpToLayout(0)),
                 Event::Key(Key::Char('1')) => Some(InputEvent::JumpToLayout(1)),
                 Event::Key(Key::Char('2')) => Some(InputEvent::JumpToLayout(2)),
                 Event::Key(Key::Char('3')) => Some(InputEvent::JumpToLayout(3)),
@@ -227,6 +231,11 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
                 Event::Key(Key::Char('5')) => Some(InputEvent::JumpToLayout(5)),
                 Event::Key(Key::Char('6')) => Some(InputEvent::JumpToLayout(6)),
                 Event::Key(Key::Char('7')) => Some(InputEvent::JumpToLayout(7)),
+                Event::Key(Key::Char('8')) => Some(InputEvent::JumpToLayout(8)),
+                Event::Key(Key::Char('9')) => Some(InputEvent::JumpToLayout(9)),
+                Event::Key(Key::Char('\n')) | Event::Key(Key::Char(' ')) => {
+                    Some(InputEvent::JumpToLayout(1))
+                }
 
                 // Sort cycling (vim s/S)
                 Event::Key(Key::Char('s')) => Some(InputEvent::CycleSortForward),
@@ -251,7 +260,7 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
 
             if let Some(event) = input_event {
                 let should_quit = matches!(event, InputEvent::Quit);
-                if tx.send(event).await.is_err() {
+                if tx.blocking_send(event).is_err() {
                     break;
                 }
 

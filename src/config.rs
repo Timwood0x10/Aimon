@@ -96,7 +96,7 @@ impl Default for Config {
                 show_processes: true,
                 show_history: true,
                 history_size: 60,
-                theme: "default".to_string(),
+                theme: "mactop_green".to_string(),
             },
             notifications: NotificationConfig {
                 enabled: true,
