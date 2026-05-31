@@ -19,8 +19,6 @@ pub struct CliArgs {
     pub config_file: Option<String>,
     pub theme: Option<String>,
     pub lang: Option<String>,
-    pub server_mode: bool,
-    pub port: u16,
     pub json_output: bool,
     pub csv_output: bool,
     pub stream_format: Option<String>,
@@ -75,19 +73,6 @@ pub fn parse_args() -> CliArgs {
                 .help("Set language (en, zh)"),
         )
         .arg(
-            Arg::new("server")
-                .long("server")
-                .help("Start HTTP API server mode")
-                .action(clap::ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .value_name("PORT")
-                .help("Server port (default: 8484)")
-                .value_parser(clap::value_parser!(u16)),
-        )
-        .arg(
             Arg::new("json")
                 .long("json")
                 .help("Output metrics as JSON once and exit")
@@ -114,8 +99,6 @@ pub fn parse_args() -> CliArgs {
         config_file: matches.get_one::<String>("config").cloned(),
         theme: matches.get_one::<String>("theme").cloned(),
         lang: matches.get_one::<String>("lang").cloned(),
-        server_mode: matches.get_flag("server"),
-        port: matches.get_one::<u16>("port").copied().unwrap_or(8484),
         json_output: matches.get_flag("json"),
         csv_output: matches.get_flag("csv"),
         stream_format: matches.get_one::<String>("stream").cloned(),
@@ -161,6 +144,7 @@ pub enum InputEvent {
     PreviousTab,
     ToggleNotifications,
     Refresh,
+    ShowSessionReport,
     CycleTheme,
     /// Switch to next layout
     NextLayout,
@@ -251,6 +235,7 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
                 // Existing bindings
                 Event::Key(Key::Char('n')) => Some(InputEvent::ToggleNotifications),
                 Event::Key(Key::Char('r')) => Some(InputEvent::Refresh),
+                Event::Key(Key::Char('R')) => Some(InputEvent::ShowSessionReport),
                 Event::Key(Key::Char('t')) => Some(InputEvent::CycleTheme),
                 Event::Key(Key::Char('\t')) => Some(InputEvent::NextLayout),
                 Event::Key(Key::BackTab) => Some(InputEvent::PreviousLayout),
@@ -259,13 +244,7 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
             };
 
             if let Some(event) = input_event {
-                let should_quit = matches!(event, InputEvent::Quit);
                 if tx.blocking_send(event).is_err() {
-                    break;
-                }
-
-                // Exit on quit
-                if should_quit {
                     break;
                 }
             }

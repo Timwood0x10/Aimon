@@ -1,13 +1,22 @@
 [package]
-name = "system-alert"
+name = "Aimon"
 version = "0.2.0"
 edition = "2021"
 authors = ["Marky"]
 license = "MIT OR Apache-2.0"
-description = "A Rust library for monitoring and visualizing system alerts."
-homepage = "https://github.com/Marky-Shi/system_alert.git"
-repository = "https://github.com/Marky-Shi/system_alert.git"
+description = "A macOS terminal system monitor with Apple Silicon power metrics."
+homepage = "https://github.com/Marky-Shi/Aimon.git"
+repository = "https://github.com/Marky-Shi/Aimon.git"
 readme = "README.md"
+include = [
+    "src/**",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "config.toml",
+]
 keywords = ["system-monitor", "macos", "apple-silicon", "terminal-ui", "monitoring"]
 categories = [
     "command-line-utilities",
@@ -23,14 +32,12 @@ libc = "0.2.177"
 ratatui = { version = "0.25.0", default-features = false, features = ["termion"] }
 lazy_static = "1.4.0"
 regex = "1.11.1"
-tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros", "time", "process", "sync", "io-std"] }
+tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros", "time", "process", "sync", "io-std", "io-util"] }
 log = "0.4.20"
 env_logger = "0.11.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
-actix-web = "4.8"
-actix-rt = "2.9"
 prometheus = "0.13"
 chrono = { version = "0.4", features = ["serde"] }
 csv = "1.3"

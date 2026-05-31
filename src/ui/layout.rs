@@ -70,18 +70,18 @@ pub fn create_loading_layout(area: Rect) -> Vec<Rect> {
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(30),
-            Constraint::Percentage(40),
-            Constraint::Percentage(30),
+            Constraint::Min(1),
+            Constraint::Length(area.height.saturating_sub(4).min(32)),
+            Constraint::Min(1),
         ])
         .split(area);
 
     let horizontal = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(60),
-            Constraint::Percentage(20),
+            Constraint::Min(1),
+            Constraint::Length(area.width.saturating_sub(4).min(110)),
+            Constraint::Min(1),
         ])
         .split(vertical[1]);
 

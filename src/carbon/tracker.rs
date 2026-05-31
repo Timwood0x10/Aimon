@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
 
 /// Carbon dioxide equivalent constants
 const CO2_PER_KWH: f64 = 0.5; // kg CO2 per kWh (average grid)
@@ -14,6 +15,15 @@ pub struct CarbonEquivalent {
     pub description: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PowerAnomalyEvent {
+    pub sample_index: u64,
+    pub kind: String,
+    pub package_w: f64,
+    pub cpu_usage: f32,
+    pub top_process: Option<String>,
+}
+
 /// Tracks energy consumption and carbon footprint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CarbonTracker {
@@ -24,9 +34,12 @@ pub struct CarbonTracker {
     /// Number of recordings
     pub recording_count: u64,
     pub peak_power_w: f64,
+    pub average_power_w: f64,
+    pub session_seconds: f64,
     pub anomaly_count: u64,
     pub idle_score: u8,
     pub process_energy_wh: BTreeMap<String, f64>,
+    pub anomaly_events: VecDeque<PowerAnomalyEvent>,
 }
 
 impl CarbonTracker {
@@ -37,9 +50,12 @@ impl CarbonTracker {
             carbon_kg: 0.0,
             recording_count: 0,
             peak_power_w: 0.0,
+            average_power_w: 0.0,
+            session_seconds: 0.0,
             anomaly_count: 0,
             idle_score: 100,
             process_energy_wh: BTreeMap::new(),
+            anomaly_events: VecDeque::with_capacity(12),
         }
     }
 
@@ -69,11 +85,18 @@ impl CarbonTracker {
         self.carbon_kg = self.total_energy_wh / 1000.0 * CO2_PER_KWH;
 
         self.recording_count += 1;
+        self.session_seconds += elapsed_secs;
         self.peak_power_w = self.peak_power_w.max(watts);
+        self.average_power_w = if self.session_seconds > 0.0 {
+            self.total_energy_wh * 3600.0 / self.session_seconds
+        } else {
+            0.0
+        };
         self.idle_score = calculate_idle_score(watts, cpu_usage);
 
         if is_power_anomaly(watts, cpu_usage) {
             self.anomaly_count += 1;
+            self.push_anomaly_event(watts, cpu_usage, processes);
         }
 
         self.record_process_energy(watts, elapsed_secs, processes);
@@ -106,6 +129,31 @@ impl CarbonTracker {
             let share = (*cpu / total_cpu).clamp(0.0, 1.0) as f64;
             *self.process_energy_wh.entry(name.clone()).or_insert(0.0) += energy_wh * share;
         }
+    }
+
+    fn push_anomaly_event(&mut self, watts: f64, cpu_usage: f32, processes: &[(String, f32)]) {
+        if self.anomaly_events.len() >= 12 {
+            self.anomaly_events.pop_front();
+        }
+
+        let top_process = processes
+            .iter()
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .filter(|(_, cpu)| *cpu >= 5.0)
+            .map(|(name, _)| name.clone());
+        let kind = if watts >= 18.0 && cpu_usage < 25.0 {
+            "High idle".to_string()
+        } else {
+            "Peak draw".to_string()
+        };
+
+        self.anomaly_events.push_back(PowerAnomalyEvent {
+            sample_index: self.recording_count,
+            kind,
+            package_w: watts,
+            cpu_usage,
+            top_process,
+        });
     }
 
     /// Get total energy in kilowatt-hours
@@ -144,9 +192,12 @@ impl CarbonTracker {
         self.carbon_kg = 0.0;
         self.recording_count = 0;
         self.peak_power_w = 0.0;
+        self.average_power_w = 0.0;
+        self.session_seconds = 0.0;
         self.anomaly_count = 0;
         self.idle_score = 100;
         self.process_energy_wh.clear();
+        self.anomaly_events.clear();
     }
 }
 
@@ -253,6 +304,12 @@ mod tests {
 
         assert_eq!(tracker.peak_power_w, 20.0);
         assert_eq!(tracker.anomaly_count, 1);
+        assert_eq!(tracker.anomaly_events.len(), 1);
+        assert_eq!(tracker.anomaly_events[0].kind, "High idle");
+        assert_eq!(
+            tracker.anomaly_events[0].top_process.as_deref(),
+            Some("Safari")
+        );
         assert!(tracker.idle_score < 100);
 
         let top = tracker.top_processes_by_energy(1);

@@ -33,7 +33,7 @@ pub fn render_carbon_panel(f: &mut Frame, area: Rect, tracker: &CarbonTracker, t
             Style::default().fg(theme.fg),
         )),
         Line::from(Span::styled(
-            format!("Avg W   {:>8.2}", power_w),
+            format!("Avg W   {:>8.2}", tracker.average_power_w.max(power_w)),
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(
@@ -43,6 +43,10 @@ pub fn render_carbon_panel(f: &mut Frame, area: Rect, tracker: &CarbonTracker, t
         Line::from(Span::styled(
             format!("Bulb    {:>8.2} h", equivalents.lightbulb_hours),
             Style::default().fg(Color::Gray),
+        )),
+        Line::from(Span::styled(
+            format!("Session {:>8}", format_duration(tracker.session_seconds)),
+            Style::default().fg(theme.fg),
         )),
     ];
 
@@ -80,10 +84,10 @@ pub fn render_efficiency_advisor(f: &mut Frame, area: Rect, data: &SystemData, t
         )),
         Line::from(Span::styled(
             format!(
-                "Package {:>6.2}W  CPU {:>5.1}%  Events {}",
-                current_power_w, cpu_usage, tracker.anomaly_count
+                "Avg {:>5.1}W  CPU {:>5.1}%  Events {}",
+                tracker.average_power_w, cpu_usage, tracker.anomaly_count
             ),
-            Style::default().fg(Color::Gray),
+            Style::default().fg(theme.fg),
         )),
         Line::from(Span::styled(
             top_energy
@@ -103,6 +107,29 @@ pub fn render_efficiency_advisor(f: &mut Frame, area: Rect, data: &SystemData, t
         ))
     }));
 
+    let recent_events: Vec<_> = tracker.anomaly_events.iter().rev().take(3).collect();
+    if !recent_events.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Recent anomalies:",
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        )));
+        for event in recent_events {
+            let process = event
+                .top_process
+                .as_deref()
+                .map(truncate_process_name)
+                .unwrap_or_else(|| "unknown".to_string());
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "#{} {} {:.1}W CPU {:.0}% {}",
+                    event.sample_index, event.kind, event.package_w, event.cpu_usage, process
+                ),
+                Style::default().fg(theme.fg),
+            )));
+        }
+    }
+
     let block = Paragraph::new(lines)
         .style(Style::default().fg(theme.fg).bg(theme.bg))
         .block(
@@ -114,6 +141,20 @@ pub fn render_efficiency_advisor(f: &mut Frame, area: Rect, data: &SystemData, t
         );
 
     f.render_widget(block, area);
+}
+
+fn format_duration(seconds: f64) -> String {
+    let seconds = seconds.max(0.0) as u64;
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+    if hours > 0 {
+        format!("{}h{:02}m", hours, minutes)
+    } else if minutes > 0 {
+        format!("{}m{:02}s", minutes, secs)
+    } else {
+        format!("{}s", secs)
+    }
 }
 
 fn build_efficiency_advice(

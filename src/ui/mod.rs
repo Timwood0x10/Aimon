@@ -23,6 +23,8 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame, Terminal,
 };
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::process::Command;
 use sysinfo::System;
@@ -40,6 +42,8 @@ pub struct UI {
     current_layout: LayoutType,
     /// Whether help overlay is shown
     show_help: bool,
+    /// Whether the session report overlay is shown
+    show_session_report: bool,
     /// Process list scroll offset
     scroll_offset: usize,
 }
@@ -68,6 +72,7 @@ impl UI {
             party_state: PartyMode::new(),
             current_layout: LayoutType::Startup,
             show_help: false,
+            show_session_report: false,
             scroll_offset: settings.process_scroll_offset,
         })
     }
@@ -116,104 +121,27 @@ impl UI {
         Self::fill_background(f, size, theme.bg);
 
         let summary = StartupSummary::collect();
-        let loading_lines = vec![
-            Line::from(Span::styled(
-                "███╗   ███╗ █████╗  ██████╗",
-                Style::default()
-                    .fg(theme.border_color)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                "████╗ ████║██╔══██╗██╔════╝",
-                Style::default()
-                    .fg(theme.border_color)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                "██╔████╔██║███████║██║     ",
-                Style::default()
-                    .fg(theme.border_color)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                "██║╚██╔╝██║██╔══██║██║     ",
-                Style::default()
-                    .fg(theme.border_color)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                "██║ ╚═╝ ██║██║  ██║╚██████╗",
-                Style::default()
-                    .fg(theme.border_color)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                "╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝",
-                Style::default()
-                    .fg(theme.border_color)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled("by TimWood", Style::default().fg(Color::Gray))),
-            Line::from(""),
-            Line::from(Span::styled(
-                format!("system-alert v{}", env!("CARGO_PKG_VERSION")),
-                Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(""),
-            Line::from(Span::styled(
-                format!("Host:     {}", summary.host_name),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!(
-                    "macOS:    {} ({})",
-                    summary.os_version, summary.kernel_version
-                ),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!("Model:    {}", summary.model_identifier),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!("Arch:     {}", summary.cpu_arch),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!("CPU:      {}", summary.cpu_brand),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!("Cores:    {} logical", summary.cpu_cores),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!("Memory:   {:.1} GB", summary.memory_gb),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(Span::styled(
-                format!("Serial:   {}", summary.serial_number),
-                Style::default().fg(theme.fg),
-            )),
-            Line::from(""),
-            Line::from(Span::styled(
-                "Press Enter / Space / 1 to enter dashboard · 0 returns here · q quits",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ];
+        let mut loading_lines = build_startup_banner_lines(theme);
 
-        let loading_block = Paragraph::new(loading_lines)
+        loading_lines.extend(build_startup_dashboard_lines(&summary, theme));
+        loading_lines.push(Line::from(""));
+        loading_lines.push(startup_centered_line(
+            "Keys: Enter / Space / 1 dashboard · R report · t theme · ? help · q quit",
+            Style::default().fg(Color::DarkGray),
+        ));
+
+        let startup_block = Paragraph::new(loading_lines)
             .block(
                 Block::default()
-                    .title(" STARTUP SUMMARY ")
+                    .title(" AIMON STARTUP SUMMARY ")
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(theme.border_color)),
             )
-            .alignment(Alignment::Center);
+            .alignment(Alignment::Left);
 
-        let areas = layout::create_loading_layout(size);
-        f.render_widget(loading_block, areas[0]);
+        let startup_area = centered_startup_area(size);
+        f.render_widget(startup_block, startup_area);
     }
 
     /// Main draw function - dispatches to the current layout
@@ -226,6 +154,7 @@ impl UI {
         let theme = &self.theme;
         let current_layout = self.current_layout;
         let show_help = self.show_help;
+        let show_session_report = self.show_session_report;
 
         self.terminal.draw(|f| {
             // Fill background first to prevent terminal transparency
@@ -268,6 +197,9 @@ impl UI {
             // Draw help overlay on top if active
             if show_help {
                 components::render_help_overlay(f, theme);
+            }
+            if show_session_report {
+                components::render_session_report_overlay(f, data, theme);
             }
         })?;
 
@@ -316,6 +248,16 @@ impl UI {
     /// Toggle help overlay visibility
     pub fn toggle_help(&mut self) {
         self.show_help = !self.show_help;
+    }
+
+    /// Toggle session report overlay visibility
+    pub fn toggle_session_report(&mut self) {
+        self.show_session_report = !self.show_session_report;
+    }
+
+    /// Check whether session report overlay is visible
+    pub fn is_session_report_visible(&self) -> bool {
+        self.show_session_report
     }
 
     /// Scroll process list down
@@ -379,6 +321,7 @@ impl UI {
 }
 
 struct StartupSummary {
+    system_name: String,
     host_name: String,
     os_version: String,
     kernel_version: String,
@@ -386,8 +329,13 @@ struct StartupSummary {
     cpu_arch: String,
     cpu_brand: String,
     cpu_cores: usize,
+    cpu_frequency_mhz: u64,
     memory_gb: f64,
+    used_memory_gb: f64,
+    uptime_seconds: u64,
     serial_number: String,
+    is_root: bool,
+    has_battery_hint: bool,
 }
 
 impl StartupSummary {
@@ -400,6 +348,7 @@ impl StartupSummary {
             .unwrap_or_else(|| "Unknown CPU".to_string());
 
         Self {
+            system_name: System::name().unwrap_or_else(|| "Unknown".to_string()),
             host_name: System::host_name().unwrap_or_else(|| "Unknown".to_string()),
             os_version: System::os_version().unwrap_or_else(|| "Unknown".to_string()),
             kernel_version: System::kernel_version().unwrap_or_else(|| "Unknown".to_string()),
@@ -408,9 +357,228 @@ impl StartupSummary {
             cpu_arch: System::cpu_arch().unwrap_or_else(|| "Unknown".to_string()),
             cpu_brand,
             cpu_cores: system.cpus().len(),
+            cpu_frequency_mhz: system
+                .cpus()
+                .first()
+                .map(|cpu| cpu.frequency())
+                .unwrap_or(0),
             memory_gb: system.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0,
+            used_memory_gb: system.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0,
+            uptime_seconds: System::uptime(),
             serial_number: read_serial_number().unwrap_or_else(|| "Unknown".to_string()),
+            is_root: unsafe { libc::geteuid() == 0 },
+            has_battery_hint: Command::new("pmset")
+                .arg("-g")
+                .arg("batt")
+                .output()
+                .map(|output| String::from_utf8_lossy(&output.stdout).contains('%'))
+                .unwrap_or(false),
         }
+    }
+}
+
+const STARTUP_CONTENT_WIDTH: usize = 100;
+const STARTUP_COLUMN_WIDTH: usize = 47;
+
+fn build_startup_banner_lines(theme: &Theme) -> Vec<Line<'static>> {
+    let logo_style = Style::default()
+        .fg(theme.border_color)
+        .add_modifier(Modifier::BOLD);
+    vec![
+        startup_centered_line(" █████╗ ██╗███╗   ███╗ ██████╗ ███╗   ██╗", logo_style),
+        startup_centered_line("██╔══██╗██║████╗ ████║██╔═══██╗████╗  ██║", logo_style),
+        startup_centered_line("███████║██║██╔████╔██║██║   ██║██╔██╗ ██║", logo_style),
+        startup_centered_line("██╔══██║██║██║╚██╔╝██║██║   ██║██║╚██╗██║", logo_style),
+        startup_centered_line("██║  ██║██║██║ ╚═╝ ██║╚██████╔╝██║ ╚████║", logo_style),
+        startup_centered_line("╚═╝  ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝", logo_style),
+        startup_centered_line("by TimWood", Style::default().fg(Color::Gray)),
+        startup_centered_line(
+            "┌─ Apple Silicon Energy Dashboard ─┐",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Line::from(""),
+        startup_centered_line(
+            &format!("system-alert v{}", env!("CARGO_PKG_VERSION")),
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        ),
+        Line::from(""),
+    ]
+}
+
+fn build_startup_dashboard_lines(summary: &StartupSummary, theme: &Theme) -> Vec<Line<'static>> {
+    let battery = if summary.has_battery_hint {
+        "detected"
+    } else {
+        "unknown"
+    };
+    let left = [
+        startup_kv("Host", &summary.host_name),
+        startup_kv("Name", &summary.system_name),
+        startup_kv("macOS", &summary.os_version),
+        startup_kv("Kernel", &summary.kernel_version),
+        startup_kv("Model", &summary.model_identifier),
+        startup_kv("Serial", &mask_serial_number(&summary.serial_number)),
+    ];
+    let right = [
+        startup_kv("CPU", &summary.cpu_brand),
+        startup_kv("Arch", &summary.cpu_arch),
+        startup_kv("Cores", &format!("{} logical", summary.cpu_cores)),
+        startup_kv("Clock", &format!("{} MHz", summary.cpu_frequency_mhz)),
+        startup_kv(
+            "Memory",
+            &format!(
+                "{:.1} / {:.1} GB",
+                summary.used_memory_gb, summary.memory_gb
+            ),
+        ),
+        startup_kv(
+            "Power",
+            &format!(
+                "battery {} · uptime {}",
+                battery,
+                format_startup_uptime(summary.uptime_seconds)
+            ),
+        ),
+    ];
+
+    let checks = [
+        ("terminal", true),
+        ("snapshot", summary.cpu_cores > 0),
+        ("powermetrics", summary.is_root),
+        ("battery", summary.has_battery_hint),
+    ];
+    let check_line = checks
+        .iter()
+        .map(|(name, ok)| format!("[{} {}]", if *ok { "OK" } else { "WARN" }, name))
+        .collect::<Vec<_>>()
+        .join("  ");
+
+    let mut lines = vec![startup_pair_line(
+        "Hardware Summary",
+        "System Profile",
+        Style::default()
+            .fg(theme.accent)
+            .add_modifier(Modifier::BOLD),
+    )];
+    for (left_item, right_item) in left.iter().zip(right.iter()) {
+        lines.push(startup_pair_line(
+            left_item,
+            right_item,
+            Style::default().fg(theme.fg),
+        ));
+    }
+    lines.push(Line::from(""));
+    lines.push(startup_centered_line(
+        &check_line,
+        Style::default().fg(if summary.is_root {
+            theme.fg
+        } else {
+            theme.warning_color
+        }),
+    ));
+    lines
+}
+
+fn startup_kv(key: &str, value: &str) -> String {
+    format!("{key:<8} {value}")
+}
+
+fn startup_pair_line(left: &str, right: &str, style: Style) -> Line<'static> {
+    Line::from(Span::styled(
+        format!(
+            "  {:<left_width$}  {:<right_width$}",
+            truncate_startup_field(left, STARTUP_COLUMN_WIDTH),
+            truncate_startup_field(right, STARTUP_COLUMN_WIDTH),
+            left_width = STARTUP_COLUMN_WIDTH,
+            right_width = STARTUP_COLUMN_WIDTH
+        ),
+        style,
+    ))
+}
+
+fn startup_centered_line(text: &str, style: Style) -> Line<'static> {
+    let text = truncate_startup_field(text, STARTUP_CONTENT_WIDTH);
+    let width = text.chars().count();
+    let padding = STARTUP_CONTENT_WIDTH.saturating_sub(width) / 2;
+    Line::from(Span::styled(
+        format!("{}{}", " ".repeat(padding), text),
+        style,
+    ))
+}
+
+fn mask_serial_number(serial: &str) -> String {
+    let serial = serial.trim();
+    if serial.is_empty() || serial.eq_ignore_ascii_case("unknown") {
+        return "Unknown".to_string();
+    }
+
+    let chars: Vec<char> = serial.chars().collect();
+    let hash = short_serial_hash(serial);
+    if chars.len() <= 4 {
+        return format!(
+            "{}#{}{}",
+            chars.first().copied().unwrap_or_default(),
+            hash,
+            chars.last().copied().unwrap_or_default()
+        );
+    }
+
+    let prefix: String = chars.iter().take(2).collect();
+    let suffix: String = chars
+        .iter()
+        .rev()
+        .take(2)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{}#{}#{}", prefix, hash, suffix)
+}
+
+fn short_serial_hash(serial: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    serial.hash(&mut hasher);
+    format!("{:06X}", hasher.finish() & 0xFF_FFFF)
+}
+
+fn centered_startup_area(area: Rect) -> Rect {
+    let width = area.width.saturating_sub(2).min(110).max(40);
+    let height = area.height.saturating_sub(2).min(30).max(12);
+    let x = area.x + area.width.saturating_sub(width) / 2;
+    let y = area.y + area.height.saturating_sub(height) / 2;
+
+    Rect {
+        x,
+        y,
+        width: width.min(area.width),
+        height: height.min(area.height),
+    }
+}
+
+fn truncate_startup_field(value: &str, max_len: usize) -> String {
+    if value.chars().count() <= max_len {
+        return value.to_string();
+    }
+    let mut truncated = value
+        .chars()
+        .take(max_len.saturating_sub(1))
+        .collect::<String>();
+    truncated.push('…');
+    truncated
+}
+
+fn format_startup_uptime(seconds: u64) -> String {
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    if days > 0 {
+        format!("{}d {}h {}m", days, hours, minutes)
+    } else if hours > 0 {
+        format!("{}h {}m", hours, minutes)
+    } else {
+        format!("{}m", minutes)
     }
 }
 

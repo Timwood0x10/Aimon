@@ -2,10 +2,10 @@
 //! Contains reusable widgets and rendering functions
 
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph},
     Frame,
 };
 
@@ -31,6 +31,12 @@ fn panel_block(title: &str, _color: Color, theme: &Theme) -> Block<'static> {
 
 /// Render header with system info
 pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
+    let power = data.cpu_info.power_metrics.package_w;
+    let idle_high = data.cpu_info.average_usage < 25.0 && power >= 18.0;
+    let thermal_ok = data.thermal_info.thermal_pressure < 50;
+    let carbon_low = data.carbon_info.carbon_kg < 0.001;
+    let battery_good = data.battery_info.percentage >= 30.0 || data.battery_info.is_plugged;
+
     let header_line = Line::from(vec![
         Span::styled(
             " MACTOP++ ",
@@ -51,6 +57,32 @@ pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme
         Span::styled(
             format!("{}{}", " │ ", data.system_info.cpu_arch),
             Style::default().fg(Color::Gray),
+        ),
+        Span::styled(
+            format!(
+                " │ [{}] [{}] [{}] [{}]",
+                if idle_high { "IDLE HIGH" } else { "IDLE OK" },
+                if thermal_ok {
+                    "THERMAL OK"
+                } else {
+                    "THERMAL HOT"
+                },
+                if carbon_low {
+                    "CARBON LOW"
+                } else {
+                    "CARBON RUN"
+                },
+                if battery_good {
+                    "BATTERY GOOD"
+                } else {
+                    "BATTERY LOW"
+                }
+            ),
+            Style::default().fg(if idle_high {
+                theme.warning_color
+            } else {
+                theme.accent
+            }),
         ),
     ]);
 
@@ -179,6 +211,7 @@ pub fn render_battery_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
     };
 
     let status = if batt.is_charging { "⚡" } else { "🔋" };
+    let runtime_prediction = predict_runtime_minutes(data);
     let lines = vec![
         Line::from(Span::styled(
             format!("{} {:.0}%", status, batt.percentage),
@@ -195,6 +228,13 @@ pub fn render_battery_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         )),
         Line::from(Span::styled(
             format!("  Power: {}W", batt.power_adapter_wattage),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(Span::styled(
+            format!(
+                "  Runtime: {}",
+                format_runtime_prediction(runtime_prediction)
+            ),
             Style::default().fg(theme.fg),
         )),
     ];
@@ -218,7 +258,7 @@ pub fn render_battery_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
 /// Render power consumption stats
 pub fn render_power_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let power = &data.cpu_info.power_metrics;
-    let lines = vec![
+    let mut lines = vec![
         Line::from(Span::styled(
             format!("  ⚡ Total: {:.1}W", power.package_w),
             Style::default()
@@ -239,6 +279,15 @@ pub fn render_power_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &
             Style::default().fg(theme.mem_color),
         )),
     ];
+    lines.extend(build_power_stack_lines(
+        power.cpu_w,
+        power.gpu_w,
+        power.ane_w,
+        power.dram_w,
+        power.package_w,
+        18,
+        theme,
+    ));
 
     let block = Paragraph::new(lines).style(base_style(theme)).block(
         Block::default()
@@ -319,7 +368,7 @@ pub fn render_process_list(
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            "NAME",
+            " Wh   NAME",
             Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
         ),
     ]);
@@ -347,7 +396,11 @@ pub fn render_process_list(
                 Style::default().fg(theme.mem_color),
             ),
             Span::styled(
-                p.name.chars().take(20).collect::<String>(),
+                format!("{:>5.3} ", process_energy_wh(data, &p.name)),
+                Style::default().fg(theme.accent),
+            ),
+            Span::styled(
+                p.name.chars().take(16).collect::<String>(),
                 Style::default().fg(if row % 2 == 0 { theme.fg } else { Color::Gray }),
             ),
         ]);
@@ -472,7 +525,7 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
 
     let lines = vec![
         Line::from(vec![
-            Span::styled("Pressure: ", Style::default().fg(Color::Gray)),
+            Span::styled("Pressure: ", Style::default().fg(theme.fg)),
             Span::styled(
                 format!("{}%", thermal.thermal_pressure),
                 Style::default()
@@ -481,7 +534,7 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
             ),
         ]),
         Line::from(vec![
-            Span::styled("Throttle: ", Style::default().fg(Color::Gray)),
+            Span::styled("Throttle: ", Style::default().fg(theme.fg)),
             Span::styled(
                 if thermal.thermal_throttling {
                     "YES"
@@ -498,7 +551,7 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
             ),
         ]),
         Line::from(vec![
-            Span::styled("Fans: ", Style::default().fg(Color::Gray)),
+            Span::styled("Fans: ", Style::default().fg(theme.fg)),
             Span::styled(
                 thermal
                     .fan_speeds
@@ -527,11 +580,6 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
     f.render_widget(block, area);
 }
 
-/// Get color based on CPU usage percentage
-fn get_cpu_usage_color(_usage: f32, theme: &Theme) -> Color {
-    theme.fg
-}
-
 /// Render CPU core usage bar chart with gradient bars
 pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let core_usages = &data.cpu_info.core_usages;
@@ -539,30 +587,39 @@ pub fn render_cpu_cores_bar_chart(f: &mut Frame, area: Rect, data: &SystemData, 
         return;
     }
 
-    let num_cores = core_usages.len();
-    let max_cores_per_row = 4;
-    let _rows = num_cores.div_ceil(max_cores_per_row);
-
-    // Create lines for each core
     let mut lines = Vec::new();
 
-    for (i, &usage) in core_usages.iter().enumerate() {
-        let core_color = get_cpu_usage_color(usage, theme);
-        let bar_length = (usage / 100.0 * 20.0) as usize;
-        let bar = "█".repeat(bar_length);
-        let empty = "░".repeat(20 - bar_length);
-
-        let line = Line::from(vec![
-            Span::styled(format!("C{:02} ", i), Style::default().fg(Color::Gray)),
-            Span::styled(format!("{}{}", bar, empty), Style::default().fg(core_color)),
-            Span::styled(format!(" {:5.1}%", usage), Style::default().fg(theme.fg)),
-        ]);
-        lines.push(line);
+    let e_count = data.system_info.e_core_count.min(core_usages.len());
+    let p_count = data
+        .system_info
+        .p_core_count
+        .min(core_usages.len().saturating_sub(e_count));
+    lines.push(core_matrix_line("E", &core_usages[..e_count], theme));
+    if p_count > 0 {
+        lines.push(core_matrix_line(
+            "P",
+            &core_usages[e_count..e_count + p_count],
+            theme,
+        ));
+    }
+    if e_count + p_count < core_usages.len() {
+        lines.push(core_matrix_line(
+            "X",
+            &core_usages[e_count + p_count..],
+            theme,
+        ));
+    }
+    lines.push(Line::from(""));
+    for (label, usage) in core_usages.iter().enumerate().take(6) {
+        lines.push(Line::from(Span::styled(
+            format!("C{:02} {:>5.1}%", label, usage),
+            Style::default().fg(theme.fg),
+        )));
     }
 
     let block = Paragraph::new(lines).style(base_style(theme)).block(
         Block::default()
-            .title(" ◈ CPU CORES ".to_string())
+            .title(" ◈ CORE MATRIX ".to_string())
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(
@@ -1104,7 +1161,7 @@ pub fn render_gpu_gauge(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
         .label(Span::styled(
             label,
             Style::default()
-                .fg(Color::White)
+                .fg(theme.fg)
                 .bg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         ));
@@ -1479,4 +1536,260 @@ pub fn render_system_details(f: &mut Frame, area: Rect, data: &SystemData, theme
     );
 
     f.render_widget(block, area);
+}
+
+pub fn render_session_report_overlay(f: &mut Frame, data: &SystemData, theme: &Theme) {
+    let area = centered_rect(62, 62, f.size());
+    f.render_widget(Clear, area);
+
+    let tracker = &data.carbon_info;
+    let top_energy = tracker.top_processes_by_energy(1).into_iter().next();
+    let mut lines = vec![
+        Line::from(Span::styled(
+            "Session Report",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            format!(
+                "Runtime        {}",
+                format_duration(tracker.session_seconds)
+            ),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(Span::styled(
+            format!("Energy         {:.4} Wh", tracker.total_energy_wh),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(Span::styled(
+            format!("CO₂            {:.5} kg", tracker.carbon_kg),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(Span::styled(
+            format!(
+                "Power avg/peak {:.1}W / {:.1}W",
+                tracker.average_power_w, tracker.peak_power_w
+            ),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(Span::styled(
+            format!("Anomalies      {}", tracker.anomaly_count),
+            Style::default().fg(if tracker.anomaly_count > 0 {
+                theme.warning_color
+            } else {
+                theme.fg
+            }),
+        )),
+        Line::from(Span::styled(
+            top_energy
+                .map(|(name, wh)| {
+                    format!("Top offender   {} ({:.4} Wh)", truncate_name(&name, 28), wh)
+                })
+                .unwrap_or_else(|| "Top offender   collecting baseline".to_string()),
+            Style::default().fg(theme.fg),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Recent anomaly timeline",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        )),
+    ];
+
+    for event in tracker.anomaly_events.iter().rev().take(5) {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "#{:<4} {:<10} {:>5.1}W CPU {:>4.0}% {}",
+                event.sample_index,
+                event.kind,
+                event.package_w,
+                event.cpu_usage,
+                event
+                    .top_process
+                    .as_deref()
+                    .map(|name| truncate_name(name, 18))
+                    .unwrap_or_else(|| "unknown".to_string())
+            ),
+            Style::default().fg(theme.fg),
+        )));
+    }
+    if tracker.anomaly_events.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No anomalies recorded in this run.",
+            Style::default().fg(theme.fg),
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Press R to close · q exits",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+                .title(" RUN REPORT ")
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.border_color)),
+        );
+    f.render_widget(block, area);
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(area);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+fn process_energy_wh(data: &SystemData, process_name: &str) -> f64 {
+    data.carbon_info
+        .process_energy_wh
+        .get(process_name)
+        .copied()
+        .unwrap_or(0.0)
+}
+
+fn core_matrix_line(label: &str, usages: &[f32], theme: &Theme) -> Line<'static> {
+    let mut spans = vec![Span::styled(
+        format!("{} ", label),
+        Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+    )];
+    for usage in usages {
+        let symbol = if *usage >= 75.0 {
+            "▓"
+        } else if *usage >= 35.0 {
+            "▒"
+        } else {
+            "░"
+        };
+        let color = if *usage >= 75.0 {
+            theme.critical_color
+        } else if *usage >= 35.0 {
+            theme.warning_color
+        } else {
+            theme.cpu_color
+        };
+        spans.push(Span::styled(
+            format!("[{}]", symbol),
+            Style::default().fg(color),
+        ));
+    }
+    Line::from(spans)
+}
+
+fn build_power_stack_lines(
+    cpu_w: f64,
+    gpu_w: f64,
+    ane_w: f64,
+    dram_w: f64,
+    package_w: f64,
+    width: usize,
+    theme: &Theme,
+) -> Vec<Line<'static>> {
+    let known_w = (cpu_w + gpu_w + ane_w + dram_w).max(0.0);
+    let total_w = package_w.max(known_w).max(0.1);
+    let segments = [
+        ("C", cpu_w, theme.cpu_color),
+        ("G", gpu_w, theme.warning_color),
+        ("A", ane_w, theme.mem_color),
+        ("D", dram_w, theme.accent),
+    ];
+
+    let mut spans = Vec::new();
+    spans.push(Span::styled("  Stack ", Style::default().fg(theme.fg)));
+    for (label, watts, color) in segments {
+        let cells = ((watts / total_w) * width as f64).round().max(0.0) as usize;
+        if cells > 0 {
+            spans.push(Span::styled(
+                label.repeat(cells),
+                Style::default().fg(color),
+            ));
+        }
+    }
+    if known_w < package_w {
+        let cells = (((package_w - known_w) / total_w) * width as f64).round() as usize;
+        if cells > 0 {
+            spans.push(Span::styled(
+                "O".repeat(cells),
+                Style::default().fg(Color::Gray),
+            ));
+        }
+    }
+
+    vec![
+        Line::from(""),
+        Line::from(spans),
+        Line::from(Span::styled(
+            "  C CPU · G GPU · A ANE · D DRAM · O Other",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ]
+}
+
+fn predict_runtime_minutes(data: &SystemData) -> Option<u32> {
+    let battery = &data.battery_info;
+    let watts = data
+        .carbon_info
+        .average_power_w
+        .max(data.cpu_info.power_metrics.package_w);
+    if battery.is_plugged || battery.is_charging || watts <= 0.5 || battery.percentage <= 0.0 {
+        return battery.time_remaining;
+    }
+
+    let nominal_wh = 70.0;
+    let remaining_wh = nominal_wh * (battery.percentage as f64 / 100.0);
+    Some(((remaining_wh / watts) * 60.0).round() as u32)
+}
+
+fn format_runtime_prediction(minutes: Option<u32>) -> String {
+    match minutes {
+        Some(minutes) => format!("{}h{:02}m", minutes / 60, minutes % 60),
+        None => "calculating".to_string(),
+    }
+}
+
+fn format_duration(seconds: f64) -> String {
+    let seconds = seconds.max(0.0) as u64;
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+    if hours > 0 {
+        format!("{}h{:02}m", hours, minutes)
+    } else if minutes > 0 {
+        format!("{}m{:02}s", minutes, secs)
+    } else {
+        format!("{}s", secs)
+    }
+}
+
+fn truncate_name(name: &str, max_len: usize) -> String {
+    if name.chars().count() <= max_len {
+        return name.to_string();
+    }
+    let mut truncated = name
+        .chars()
+        .take(max_len.saturating_sub(1))
+        .collect::<String>();
+    truncated.push('…');
+    truncated
 }
