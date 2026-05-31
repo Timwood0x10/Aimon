@@ -52,7 +52,9 @@ fn parse_thunderbolt_info(output: &str, info: &mut ThunderboltInfo) {
                 bus.status = trimmed.trim_start_matches("Status:").trim().to_string();
             }
             if trimmed.starts_with("Speed:") || trimmed.starts_with("Maximum Speed:") {
-                bus.speed = trimmed.split(':').nth(1)
+                bus.speed = trimmed
+                    .split(':')
+                    .nth(1)
                     .map(|s| s.trim().to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
             }

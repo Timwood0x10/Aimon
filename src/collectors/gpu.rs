@@ -1,10 +1,10 @@
 //! GPU data collector
 //! Collects GPU usage, frequency, and core information using IOReport/IOKit
 
-use crate::types::GpuInfo;
 use crate::cli::get_powermetrics_output;
-use regex::Regex;
+use crate::types::GpuInfo;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 /// Collect GPU information from powermetrics and system_profiler
 pub async fn collect_gpu_info() -> GpuInfo {
@@ -31,7 +31,8 @@ pub async fn collect_gpu_info() -> GpuInfo {
     // Calculate TFLOPs
     if gpu_info.freq_mhz > 0 && gpu_info.core_count > 0 {
         // Approximate: 2 FLOPs per clock per GPU core (FP32)
-        gpu_info.tflops = (gpu_info.core_count as f64 * gpu_info.freq_mhz as f64 * 1e6 * 2.0) / 1e12;
+        gpu_info.tflops =
+            (gpu_info.core_count as f64 * gpu_info.freq_mhz as f64 * 1e6 * 2.0) / 1e12;
     }
 
     gpu_info
@@ -40,8 +41,7 @@ pub async fn collect_gpu_info() -> GpuInfo {
 /// Parse GPU metrics from powermetrics output
 fn parse_gpu_from_powermetrics(output: &str, gpu_info: &mut GpuInfo) {
     lazy_static! {
-        static ref GPU_FREQ_REGEX: Regex =
-            Regex::new(r"GPU\s+frequency:\s+(\d+)\s+MHz").unwrap();
+        static ref GPU_FREQ_REGEX: Regex = Regex::new(r"GPU\s+frequency:\s+(\d+)\s+MHz").unwrap();
         static ref GPU_ACTIVE_REGEX: Regex =
             Regex::new(r"GPU\s+active\s+residency:\s+(\d+\.?\d*)%").unwrap();
         static ref GPU_SRAM_REGEX: Regex =

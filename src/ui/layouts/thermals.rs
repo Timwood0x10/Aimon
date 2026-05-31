@@ -43,10 +43,7 @@ pub fn draw(
 
     let row2 = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main[2]);
 
     components::render_detailed_temperatures(f, row2[0], data, theme);

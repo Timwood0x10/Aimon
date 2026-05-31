@@ -26,12 +26,12 @@ pub fn draw(
     let main = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),    // Header
-            Constraint::Length(4),    // CPU + GPU gauges
-            Constraint::Length(4),    // Memory + Power
-            Constraint::Length(7),    // CPU cores + ANE/DRAM
-            Constraint::Min(8),       // Process list + Network + Disk + Thunderbolt + Thermals
-            Constraint::Length(1),    // Status bar
+            Constraint::Length(3), // Header
+            Constraint::Length(4), // CPU + GPU gauges
+            Constraint::Length(4), // Memory + Power
+            Constraint::Length(7), // CPU cores + ANE/DRAM
+            Constraint::Min(8),    // Process list + Network + Disk + Thunderbolt + Thermals
+            Constraint::Length(1), // Status bar
         ])
         .split(size);
 

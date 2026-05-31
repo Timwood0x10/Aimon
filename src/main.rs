@@ -10,7 +10,10 @@ use system_alert::{
 };
 
 use log::{error, info, warn};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 use tokio::time::interval;
 
 #[tokio::main]
@@ -87,9 +90,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(ref format_str) = cli_args.stream_format {
         match system_alert::api::OutputFormat::parse_str(format_str) {
             Some(format) => {
-                let interval = cli_args.refresh_rate.unwrap_or(1);
+                let interval_secs = cli_args.refresh_rate.unwrap_or(1);
+                let interval_ms = cli_args.refresh_rate_ms.unwrap_or(0);
+                let interval_val = if interval_ms > 0 {
+                    interval_ms
+                } else {
+                    interval_secs * 1000
+                };
                 if let Err(e) =
-                    system_alert::api::HeadlessExporter::export_stream(interval, format).await
+                    system_alert::api::HeadlessExporter::export_stream(interval_val, format).await
                 {
                     eprintln!("Stream error: {}", e);
                     std::process::exit(1);
@@ -122,73 +131,128 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    // Initialize UI first - immediate startup
+    // ── UI init ────────────────────────────────────────────────────────
     let mut ui = UI::with_theme(&config.display.theme)?;
     info!(
         "UI initialized with theme '{}' - starting data collection in background...",
         config.display.theme
     );
-
-    // Show loading screen immediately
     ui.show_loading_screen()?;
 
-    // Initialize other components in background
-    let mut data_collector = DataCollector::new_fast();
-    let mut history = HistoryData::new(config.display.history_size);
+    // ── Shared state: data cache for background collector → UI reader ──
+    // mactop pattern: collector writes to shared state, renderer reads from it.
+    // Decoupled via Arc<RwLock>, no channel needed for data itself.
+    let system_data: Arc<RwLock<SystemData>> = Arc::new(RwLock::new(create_placeholder_data()));
+    let history: Arc<RwLock<HistoryData>> =
+        Arc::new(RwLock::new(HistoryData::new(config.display.history_size)));
+
+    // Flag to signal that new data is available for rendering
+    let data_updated: Arc<AtomicBool> = Arc::new(AtomicBool::new(true)); // true for first frame
+
+    // ── Background data collection thread ──────────────────────────────
+    // Runs on its own schedule, never blocks the input/render path.
+    // Uses std::thread to avoid Box<dyn Error> Send requirement from tokio::spawn.
+    let _collector_thread = {
+        let system_data = Arc::clone(&system_data);
+        let history = Arc::clone(&history);
+        let data_updated = Arc::clone(&data_updated);
+        let refresh_ms = if config.refresh_rate_ms > 0 {
+            config.refresh_rate_ms
+        } else {
+            config.refresh_rate * 1000
+        };
+        let refresh_duration = Duration::from_millis(refresh_ms);
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async move {
+                let mut collector = DataCollector::new_fast();
+                let mut tick = interval(refresh_duration);
+                tick.tick().await; // skip the immediate first tick
+                loop {
+                    tick.tick().await;
+                    match collector.collect_all_data().await {
+                        Ok(new_data) => {
+                            {
+                                let mut cache = system_data.write().await;
+                                *cache = new_data;
+                            }
+                            {
+                                let data_snap = system_data.read().await;
+                                let mut hist = history.write().await;
+                                hist.update_from_system_data(&data_snap);
+                            }
+                            data_updated.store(true, Ordering::Relaxed);
+                        }
+                        Err(e) => {
+                            error!("Data collection error: {}", e);
+                        }
+                    }
+                }
+            })
+        })
+    };
+
+    // Notification manager runs in main loop (avoids Send bound issues)
     let mut notification_manager = NotificationManager::new(
         config.notifications.enabled,
         config.notifications.cooldown_seconds,
     );
+    let mut last_notif_check = std::time::Instant::now();
 
-    // Set up input handling
+    // ── Input handling (already on std::thread via handle_input) ───────
     let mut input_receiver = handle_input().await;
 
-    // Set up refresh timer
-    let mut refresh_interval = interval(Duration::from_secs(config.refresh_rate));
-
-    // Create initial empty data for immediate display
-    let mut system_data = create_placeholder_data();
+    // ── Render timer: independent of data collection ───────────────────
+    // mactop pattern: ticker-driven render at refresh rate.
+    // Redraws when: (1) data_updated flag from collector, (2) user input.
+    let mut render_interval = interval(Duration::from_millis(33)); // ~30 FPS
 
     info!("System monitor initialized. Press '?' for help, 'q' to quit.");
 
-    // Main event loop
+    // ── Main event loop ────────────────────────────────────────────────
+    // mactop pattern: select on input + ticker.
+    // Input → immediate dirty flag (instant redraw like mactop's drawScreen).
+    // Render → draw when dirty or data changed, never blocks on collection.
+    // Collector → background thread, writes to Arc<RwLock>.
     loop {
         tokio::select! {
-            // Handle input events
+            // ── Input branch: process event, mark dirty for instant redraw ──
             input_event = input_receiver.recv() => {
-                match input_event {
+                let handled = match input_event {
                     Some(InputEvent::Quit) => {
                         info!("Quit signal received");
                         break;
                     }
-                    Some(InputEvent::NextTab) => {
+                    Some(InputEvent::NextTab) | Some(InputEvent::NextLayout) => {
                         ui.next_layout();
+                        true
                     }
-                    Some(InputEvent::PreviousTab) => {
+                    Some(InputEvent::PreviousTab) | Some(InputEvent::PreviousLayout) => {
                         ui.previous_layout();
-                    }
-                    Some(InputEvent::NextLayout) => {
-                        ui.next_layout();
-                    }
-                    Some(InputEvent::PreviousLayout) => {
-                        ui.previous_layout();
+                        true
                     }
                     Some(InputEvent::ScrollUp) => {
                         ui.scroll_up();
+                        true
                     }
                     Some(InputEvent::ScrollDown) => {
                         ui.scroll_down();
+                        true
                     }
                     Some(InputEvent::GoToTop) => {
                         ui.go_to_top();
+                        true
                     }
                     Some(InputEvent::GoToBottom) => {
                         ui.go_to_bottom();
+                        true
                     }
                     Some(InputEvent::JumpToLayout(n)) => {
                         if let Some(layout) = LayoutType::from_key_number(n) {
                             ui.set_layout(layout);
                         }
+                        true
                     }
                     Some(InputEvent::CycleSortForward) => {
                         config.process_sort_by = match config.process_sort_by {
@@ -198,6 +262,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ProcessSortBy::Name => ProcessSortBy::Cpu,
                         };
                         info!("Sort order: {:?}", config.process_sort_by);
+                        true
                     }
                     Some(InputEvent::CycleSortBackward) => {
                         config.process_sort_by = match config.process_sort_by {
@@ -207,79 +272,86 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ProcessSortBy::Name => ProcessSortBy::Pid,
                         };
                         info!("Sort order: {:?}", config.process_sort_by);
+                        true
                     }
                     Some(InputEvent::ToggleHelp) => {
                         ui.toggle_help();
+                        true
                     }
                     Some(InputEvent::ToggleNotifications) => {
                         let new_state = !config.notifications.enabled;
                         config.notifications.enabled = new_state;
                         notification_manager.set_enabled(new_state);
                         info!("Notifications {}", if new_state { "enabled" } else { "disabled" });
+                        true
                     }
                     Some(InputEvent::Refresh) => {
-                        // Force immediate refresh by continuing to the refresh logic
+                        true // Force dirty for immediate redraw
                     }
                     Some(InputEvent::CycleTheme) => {
                         let themes = system_alert::ui::theme::Theme::all_themes();
                         let current_index = themes.iter().position(|&t| t == config.display.theme).unwrap_or(0);
                         let next_index = (current_index + 1) % themes.len();
                         config.display.theme = themes[next_index].to_string();
-
-                        // Recreate UI with new theme
                         ui = UI::with_theme_and_layout(&config.display.theme, ui.current_layout())?;
                         info!("Theme changed to: {}", config.display.theme);
+                        true
                     }
                     Some(InputEvent::TogglePartyMode) => {
                         ui.toggle_party_mode();
+                        true
                     }
                     Some(InputEvent::SearchProcess) => {
-                        // Search not yet implemented - placeholder event
                         info!("Search not yet implemented");
+                        false
                     }
                     Some(InputEvent::KillProcess) => {
-                        // Kill not yet implemented - placeholder event
                         info!("Kill process not yet implemented");
+                        false
                     }
                     Some(InputEvent::ToggleTimeTravel) => {
                         info!("Time travel not yet implemented");
+                        false
                     }
                     Some(InputEvent::ToggleAchievements) => {
                         info!("Achievements not yet implemented");
+                        false
                     }
                     None => {
                         warn!("Input channel closed");
                         break;
                     }
+                };
+
+                if handled {
+                    // mactop pattern: immediate redraw after every key event
+                    let data_snap = system_data.read().await;
+                    let hist_snap = history.read().await;
+                    if let Err(e) = ui.draw(&data_snap, &hist_snap, &config) {
+                        error!("UI draw error: {}", e);
+                    }
                 }
             }
 
-            // Handle periodic refresh
-            _ = refresh_interval.tick() => {
-                // Collect system data asynchronously
-                match data_collector.collect_all_data().await {
-                    Ok(new_data) => {
-                        system_data = new_data;
-                        // Update history
-                        history.update_from_system_data(&system_data);
-
-                        // Check for notifications
-                        if let Err(e) = notification_manager
-                            .check_and_send_notifications(&system_data, &config.thresholds)
-                            .await
-                        {
-                            error!("Notification error: {}", e);
-                        }
-                    }
-                    Err(e) => {
-                        error!("Data collection error: {}", e);
-                        // Keep using previous data, don't crash
-                    }
-                }
-
-                // Always update UI (even with old data)
-                if let Err(e) = ui.draw(&system_data, &history, &config) {
+            // ── Render branch: draw at ~30 FPS when new data available ────
+            // mactop pattern: ticker-driven render when collector wrote new data
+            _ = render_interval.tick(), if data_updated.load(Ordering::Relaxed) => {
+                let data_snap = system_data.read().await;
+                let hist_snap = history.read().await;
+                if let Err(e) = ui.draw(&data_snap, &hist_snap, &config) {
                     error!("UI draw error: {}", e);
+                }
+                data_updated.store(false, Ordering::Relaxed);
+
+                // Low-frequency notification check (every ~5s)
+                if last_notif_check.elapsed() >= Duration::from_secs(5) {
+                    last_notif_check = std::time::Instant::now();
+                    if let Err(e) = notification_manager
+                        .check_and_send_notifications(&data_snap, &config.thresholds)
+                        .await
+                    {
+                        error!("Notification error: {}", e);
+                    }
                 }
             }
         }
@@ -288,7 +360,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Save runtime state before exit
     ui.save_runtime_state(&config);
 
-    // Cleanup
+    // Cleanup — collector thread will die when the process exits
     ui.cleanup()?;
     info!("System monitor exited normally");
 
@@ -313,7 +385,7 @@ fn create_placeholder_data() -> SystemData {
             chip_name: "Loading...".to_string(),
         },
         cpu_info: CpuInfo {
-            core_usages: vec![0.0; 8], // 8 cores placeholder
+            core_usages: vec![0.0; 8],
             average_usage: 0.0,
             power_metrics: CPUMetrics::default(),
         },

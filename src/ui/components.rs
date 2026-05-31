@@ -1139,11 +1139,7 @@ pub fn render_gpu_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
             .title(" ◈ GPU ")
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(
-                Style::default()
-                    .fg(color)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
             .style(Style::default().bg(theme.bg)),
     );
 
@@ -1179,11 +1175,7 @@ pub fn render_ane_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
             .title(" ◈ ANE ")
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(
-                Style::default()
-                    .fg(color)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .border_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
             .style(Style::default().bg(theme.bg)),
     );
 
@@ -1205,14 +1197,12 @@ pub fn render_dram_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &T
         }
     };
 
-    let mut lines = vec![
-        Line::from(Span::styled(
-            format!("  ◈ Power: {:.2}W", dram.power_w),
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        )),
-    ];
+    let mut lines = vec![Line::from(Span::styled(
+        format!("  ◈ Power: {:.2}W", dram.power_w),
+        Style::default()
+            .fg(theme.accent)
+            .add_modifier(Modifier::BOLD),
+    ))];
 
     if dram.total_bytes_per_sec > 0.0 {
         lines.push(Line::from(Span::styled(
@@ -1258,7 +1248,11 @@ pub fn render_thunderbolt_info(f: &mut Frame, area: Rect, data: &SystemData, the
         )));
     } else {
         for bus in &tb.buses {
-            let status_icon = if bus.status.contains("Active") { "●" } else { "○" };
+            let status_icon = if bus.status.contains("Active") {
+                "●"
+            } else {
+                "○"
+            };
             lines.push(Line::from(Span::styled(
                 format!("  {} {} - {}", status_icon, bus.name, bus.speed),
                 Style::default()
@@ -1437,7 +1431,10 @@ pub fn render_system_details(f: &mut Frame, area: Rect, data: &SystemData, theme
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            format!("  ◈ E-Cores: {}  P-Cores: {}", sys_info.e_core_count, sys_info.p_core_count),
+            format!(
+                "  ◈ E-Cores: {}  P-Cores: {}",
+                sys_info.e_core_count, sys_info.p_core_count
+            ),
             Style::default().fg(theme.cpu_color),
         )),
     ];

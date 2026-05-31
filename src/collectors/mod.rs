@@ -124,7 +124,8 @@ impl DataCollector {
         let total_cores = self.system.cpus().len();
 
         // Determine E-core and P-core counts based on chip model
-        let (e_core_count, p_core_count, gpu_core_count) = detect_core_counts(&cpu_brand, total_cores);
+        let (e_core_count, p_core_count, gpu_core_count) =
+            detect_core_counts(&cpu_brand, total_cores);
 
         // Extract chip name from brand string
         let chip_name = extract_chip_name(&cpu_brand);

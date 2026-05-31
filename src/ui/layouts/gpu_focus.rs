@@ -39,15 +39,15 @@ fn create_gpu_focus_layout(area: Rect) -> Vec<Rect> {
         .split(main[4]);
 
     vec![
-        main[0],   // Header
-        main[1],   // CPU gauge
-        main[2],   // GPU gauge
-        row3[0],   // GPU stats
-        row3[1],   // ANE stats
-        row4[0],   // DRAM stats
-        row4[1],   // Power breakdown
-        main[5],   // CPU cores
-        main[6],   // Performance / Disk IO
+        main[0], // Header
+        main[1], // CPU gauge
+        main[2], // GPU gauge
+        row3[0], // GPU stats
+        row3[1], // ANE stats
+        row4[0], // DRAM stats
+        row4[1], // Power breakdown
+        main[5], // CPU cores
+        main[6], // Performance / Disk IO
     ]
 }
 
@@ -117,7 +117,9 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
             Span::styled("  Workload:    ", Style::default().fg(theme.fg)),
             Span::styled(
                 perf.workload_type.clone(),
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
@@ -157,7 +159,11 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
                 .title(" ◈ PERFORMANCE ")
                 .borders(Borders::ALL)
                 .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD))
+                .border_style(
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .style(Style::default().bg(theme.bg)),
         );
     f.render_widget(perf_block, bottom_split[0]);
