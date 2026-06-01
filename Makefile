@@ -1,4 +1,4 @@
-# System Alert - Makefile
+# Aimon - Makefile
 # Automated build, format, check and release management
 
 .PHONY: help build release test clean install uninstall \
@@ -6,7 +6,7 @@
 
 # Default target
 help:
-	@echo "🚀 System Alert - Build System"
+	@echo "🚀 Aimon - Build System"
 	@echo "=============================="
 	@echo ""
 	@echo "Development:"
@@ -100,15 +100,15 @@ clean:
 # Install locally
 install: release
 	@echo "📦 Installing locally..."
-	sudo cp target/release/system-alert /usr/local/bin/
-	sudo chmod +x /usr/local/bin/system-alert
-	@echo "✅ Installed to /usr/local/bin/system-alert"
-	@echo "🎯 Run with: system-alert"
+	sudo cp target/release/aimon /usr/local/bin/
+	sudo chmod +x /usr/local/bin/aimon
+	@echo "✅ Installed to /usr/local/bin/aimon"
+	@echo "🎯 Run with: aimon"
 
 # Uninstall from system
 uninstall:
 	@echo "🗑️  Uninstalling..."
-	sudo rm -f /usr/local/bin/system-alert
+	sudo rm -f /usr/local/bin/aimon
 	@echo "✅ Uninstalled successfully"
 
 # Create distribution package
@@ -144,12 +144,12 @@ check-deps:
 # Run application (debug)
 run: build
 	@echo "🚀 Running debug version..."
-	./target/debug/system-alert
+	./target/debug/aimon
 
 # Run application (release)
 run-release: release
 	@echo "🚀 Running release version..."
-	./target/release/system-alert
+	./target/release/aimon
 
 # Watch mode (requires cargo-watch)
 watch:

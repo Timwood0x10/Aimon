@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# System Alert - GitHub Release Script
+# Aimon - GitHub Release Script
 # Creates a GitHub release with assets
 
 set -e
 
-echo "🐙 System Alert - GitHub Release Script"
+echo "🐙 Aimon - GitHub Release Script"
 echo "======================================="
 
 # Colors
@@ -16,10 +16,17 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-PROJECT_NAME="system-alert"
+PROJECT_NAME="aimon"
 VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-REPO_OWNER="yourusername"  # Change this to your GitHub username
-REPO_NAME="system-alert"   # Change this to your repo name
+REMOTE_URL=$(git config --get remote.origin.url || git remote get-url os 2>/dev/null || git remote get-url pd 2>/dev/null || true)
+REPO_PATH=$(echo "${REMOTE_URL}" | sed -E 's#.*github.com[-_a-zA-Z0-9]*[:/]([^/]+/[^/.]+)(\.git)?#\1#')
+REPO_OWNER=$(echo "${REPO_PATH}" | cut -d/ -f1)
+REPO_NAME=$(echo "${REPO_PATH}" | cut -d/ -f2)
+
+if [ -z "${REPO_OWNER}" ] || [ -z "${REPO_NAME}" ]; then
+    echo -e "${RED}❌ Could not detect GitHub repository from git remotes${NC}"
+    exit 1
+fi
 DIST_DIR="dist"
 
 echo -e "${BLUE}📦 Preparing GitHub release for v${VERSION}${NC}"
@@ -54,104 +61,13 @@ if [ ! -f "${CHECKSUM_FILE}" ]; then
     exit 1
 fi
 
-# Generate release notes
-echo -e "${YELLOW}📝 Generating release notes...${NC}"
+RELEASE_NOTES_FILE="RELEASE.md"
+if [ ! -s "${RELEASE_NOTES_FILE}" ]; then
+    echo -e "${RED}❌ Release notes file not found: ${RELEASE_NOTES_FILE}${NC}"
+    exit 1
+fi
 
-RELEASE_NOTES_FILE="release-notes-v${VERSION}.md"
-cat > "${RELEASE_NOTES_FILE}" << EOF
-# System Alert v${VERSION}
-
-Advanced macOS System Monitor with real-time metrics and beautiful TUI interface.
-
-## 🚀 Features
-
-- **🔋 Advanced Battery Monitoring**: Real-time battery health, cycle count, and charging status
-- **⚡ Apple Silicon Optimization**: E-cluster/P-cluster monitoring with detailed power metrics  
-- **🎨 Beautiful TUI Interface**: Clean, organized four-quadrant layout with progress bars
-- **📊 Real-time Data**: Live system metrics with configurable refresh rates
-- **🔔 Smart Notifications**: Configurable threshold-based alerts
-- **⚙️ Highly Configurable**: TOML-based configuration with CLI overrides
-
-## 📋 System Requirements
-
-- **macOS**: 10.15+ (Optimized for Apple Silicon)
-- **Root Privileges**: Required for accessing system metrics via \`powermetrics\`
-- **Terminal**: Any modern terminal emulator with Unicode support
-
-## 🛠 Installation
-
-### Quick Install
-\`\`\`bash
-# Download and extract
-curl -L -o system-alert-v${VERSION}.tar.gz https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/${PROJECT_NAME}-v${VERSION}-macos.tar.gz
-tar -xzf system-alert-v${VERSION}.tar.gz
-cd system-alert-v${VERSION}
-
-# Install
-./install.sh
-
-# Run
-sudo system-alert
-\`\`\`
-
-### Manual Install
-\`\`\`bash
-# Make executable and copy to PATH
-chmod +x system-alert
-sudo cp system-alert /usr/local/bin/
-
-# Run
-sudo system-alert
-\`\`\`
-
-## 🎮 Usage
-
-\`\`\`bash
-# Default settings
-sudo system-alert
-
-# Custom refresh rate
-sudo system-alert --refresh 2
-
-# Minimal mode
-sudo system-alert --minimal
-
-# Show help
-system-alert --help
-\`\`\`
-
-## 🔐 Verification
-
-Verify the download integrity:
-\`\`\`bash
-shasum -a 256 -c ${PROJECT_NAME}-v${VERSION}-checksums.txt
-\`\`\`
-
-## 📊 What's New in v${VERSION}
-
-- ✅ Complete real-time data collection (no hardcoded values)
-- ✅ Advanced battery monitoring with multiple data sources
-- ✅ Optimized thermal management and fan speed monitoring
-- ✅ Real system health metrics (uptime, load averages)
-- ✅ Professional English documentation and code
-- ✅ Comprehensive build and release automation
-
-## 🐛 Known Issues
-
-- Requires \`sudo\` for full functionality (powermetrics access)
-- Some features may not work on older macOS versions
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
----
-
-**Built on:** $(date)
-**Commit:** $(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-EOF
-
-echo -e "${GREEN}✅ Release notes generated: ${RELEASE_NOTES_FILE}${NC}"
+echo -e "${GREEN}✅ Using release notes from ${RELEASE_NOTES_FILE}${NC}"
 
 # Create the release
 echo -e "${YELLOW}🚀 Creating GitHub release...${NC}"
@@ -159,7 +75,7 @@ echo -e "${YELLOW}🚀 Creating GitHub release...${NC}"
 gh release create "v${VERSION}" \
     "${ARCHIVE_FILE}" \
     "${CHECKSUM_FILE}" \
-    --title "System Alert v${VERSION}" \
+    --title "Aimon v${VERSION}" \
     --notes-file "${RELEASE_NOTES_FILE}" \
     --draft
 
@@ -168,8 +84,5 @@ echo -e "${BLUE}📋 Next steps:${NC}"
 echo -e "   1. Review the draft release at: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases"
 echo -e "   2. Edit release notes if needed"
 echo -e "   3. Publish the release when ready"
-
-# Cleanup
-rm -f "${RELEASE_NOTES_FILE}"
 
 echo -e "${GREEN}✨ Release process complete!${NC}"

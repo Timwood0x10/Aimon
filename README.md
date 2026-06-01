@@ -44,7 +44,7 @@ Some values are estimates. Per-process energy is calculated from process CPU sha
 
 ```bash
 cargo build --release
-sudo ./target/release/system-alert
+sudo ./target/release/aimon
 ```
 
 Development run:
@@ -62,7 +62,7 @@ cargo run
 ## CLI Options
 
 ```bash
-system-alert [options]
+aimon [options]
 
 Options:
   -r, --refresh <SECONDS>     Refresh interval in seconds
@@ -197,6 +197,10 @@ The theme module also contains additional named theme constructors, but not ever
 - Headless JSON/API output may still include whatever fields are exposed by `SystemData`; review output before sharing logs publicly.
 - The tool reads local system metrics and does not require network access for normal monitoring.
 
+## Inspiration
+
+Aimon is inspired by the excellent [`mactop`](https://github.com/metaspartan/mactop) project. `mactop` is MIT licensed; Aimon is an independent Rust project and keeps this attribution to clearly acknowledge the inspiration.
+
 ## Limitations
 
 - Full power metrics depend on macOS `powermetrics` permissions and availability.
@@ -245,4 +249,4 @@ src/
 
 ## License
 
-See `LICENSE`.
+Apache 2.0

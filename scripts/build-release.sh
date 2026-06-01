@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# System Alert - Release Build Script
-# Version: 0.1.0
+# Aimon - Release Build Script
+# Uses the current Cargo.toml package version.
 
 set -e
 
-echo "🚀 System Alert - Release Build Script v0.1.0"
+echo "🚀 Aimon - Release Build Script"
 echo "=============================================="
 
 # Colors for output
@@ -16,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_NAME="system-alert"
+PROJECT_NAME="aimon"
 VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 BUILD_DIR="release-builds"
 DIST_DIR="dist"
@@ -59,27 +59,27 @@ echo -e "${YELLOW}📦 Creating distribution package...${NC}"
 
 # Create README for distribution
 cat > "${BUILD_DIR}/README.txt" << EOF
-System Alert v${VERSION}
+Aimon v${VERSION}
 ========================
 
-Advanced macOS System Monitor
+macOS terminal system monitor for Apple Silicon oriented metrics
 
 INSTALLATION:
-1. Copy 'system-alert' to /usr/local/bin/ or any directory in your PATH
-2. Make it executable: chmod +x system-alert
-3. Run with: sudo system-alert
+1. Copy 'aimon' to /usr/local/bin/ or any directory in your PATH
+2. Make it executable: chmod +x aimon
+3. Run with: sudo aimon
 
 REQUIREMENTS:
 - macOS 10.15+
 - Root privileges (for powermetrics access)
 
 USAGE:
-sudo ./system-alert                    # Run with default settings
-sudo ./system-alert --refresh 2       # Custom refresh rate
-sudo ./system-alert --minimal         # Minimal mode
-sudo ./system-alert --help           # Show help
+sudo ./aimon                    # Run with default settings
+sudo ./aimon --refresh 2       # Custom refresh rate
+sudo ./aimon --minimal         # Minimal mode
+sudo ./aimon --help           # Show help
 
-For more information, visit: https://github.com/yourusername/system-alert
+For more information, visit the GitHub repository for this release.
 
 Built on: $(date)
 EOF
@@ -88,7 +88,7 @@ EOF
 cat > "${BUILD_DIR}/install.sh" << 'EOF'
 #!/bin/bash
 
-echo "🚀 Installing System Alert..."
+echo "🚀 Installing Aimon..."
 
 # Check if running as root for installation
 if [[ $EUID -eq 0 ]]; then
@@ -98,7 +98,7 @@ fi
 
 # Install to /usr/local/bin
 INSTALL_DIR="/usr/local/bin"
-BINARY_NAME="system-alert"
+BINARY_NAME="aimon"
 
 if [ -f "./${BINARY_NAME}" ]; then
     echo "📦 Installing ${BINARY_NAME} to ${INSTALL_DIR}..."
@@ -106,7 +106,7 @@ if [ -f "./${BINARY_NAME}" ]; then
     sudo chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
     
     echo "✅ Installation complete!"
-    echo "🎯 You can now run: sudo system-alert"
+    echo "🎯 You can now run: sudo aimon"
     echo "💡 Or from anywhere: sudo ${INSTALL_DIR}/${BINARY_NAME}"
 else
     echo "❌ Binary '${BINARY_NAME}' not found in current directory"
@@ -120,16 +120,16 @@ chmod +x "${BUILD_DIR}/install.sh"
 cat > "${BUILD_DIR}/uninstall.sh" << 'EOF'
 #!/bin/bash
 
-echo "🗑️  Uninstalling System Alert..."
+echo "🗑️  Uninstalling Aimon..."
 
 INSTALL_DIR="/usr/local/bin"
-BINARY_NAME="system-alert"
+BINARY_NAME="aimon"
 
 if [ -f "${INSTALL_DIR}/${BINARY_NAME}" ]; then
     sudo rm "${INSTALL_DIR}/${BINARY_NAME}"
-    echo "✅ System Alert uninstalled successfully"
+    echo "✅ Aimon uninstalled successfully"
 else
-    echo "ℹ️  System Alert not found in ${INSTALL_DIR}"
+    echo "ℹ️  Aimon not found in ${INSTALL_DIR}"
 fi
 EOF
 

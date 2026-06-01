@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# System Alert - Release Testing Script
+# Aimon - Release Testing Script
 # Tests the built release binary
 
 set -e
 
-echo "🧪 System Alert - Release Testing Script"
+echo "🧪 Aimon - Release Testing Script"
 echo "========================================"
 
 # Colors
@@ -14,7 +14,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-PROJECT_NAME="system-alert"
+PROJECT_NAME="aimon"
 BINARY_PATH="target/release/${PROJECT_NAME}"
 
 if [ ! -f "${BINARY_PATH}" ]; then

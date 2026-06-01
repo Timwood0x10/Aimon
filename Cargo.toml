@@ -1,11 +1,11 @@
 [package]
 name = "aimon"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
-authors = ["Marky"]
+authors = ["Marky, TimWood"]
 license = "MIT OR Apache-2.0"
 description = "A macOS terminal system monitor with Apple Silicon power metrics."
-homepage = "https://github.com/Marky-Shi/Aimon.git"
+homepage = "https://github.com/Timwood0x10/Aimon"
 repository = "https://github.com/Marky-Shi/Aimon.git"
 readme = "README.md"
 include = [
@@ -44,10 +44,3 @@ csv = "1.3"
 
 [dev-dependencies]
 tempfile = "3.8"
-
-[profile.release]
-strip = true
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"

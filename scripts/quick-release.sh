@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# System Alert - Quick Release Script
+# Aimon - Quick Release Script
 # One-command release process
 
 set -e
 
-echo "⚡ System Alert - Quick Release Script"
+echo "⚡ Aimon - Quick Release Script"
 echo "====================================="
 
 # Colors

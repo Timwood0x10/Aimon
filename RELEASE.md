@@ -1,171 +1,105 @@
-# 🚀 System Alert - Release Guide
+# Aimon v1.0.0 Release Notes
 
-Complete automation for building and releasing System Alert v0.2.1
+Aimon is a terminal-based macOS system monitor written in Rust. This release reflects the current project state: an Apple Silicon oriented TUI monitor with live system metrics, multiple layouts, headless export modes, and release packaging for macOS.
 
-## 📦 Available Release Methods
+## Highlights
 
-### 1. **Quick Release (Recommended)**
-One command to rule them all:
-```bash
-./scripts/quick-release.sh
-```
-This will:
-- ✅ Prompt for new version number
-- ✅ Update Cargo.toml and Cargo.lock
-- ✅ Build and test everything
-- ✅ Commit and tag the release
-- ✅ Push to GitHub (triggers automatic CI/CD)
+- Interactive Ratatui terminal UI with startup, full, advanced, minimal, compact, battery, GPU, network, system health, and thermal layouts.
+- macOS and Apple Silicon focused collection for CPU, memory, battery, thermal, process, network, disk I/O, power, energy, and carbon estimates.
+- Session report shown before exit, including runtime, estimated Wh, CO₂ estimate, average/peak power, anomaly count, and top estimated energy offender.
+- Headless output modes for one-shot JSON/CSV and streaming JSON, CSV, or Prometheus output.
+- Theme switching, TOML configuration, bilingual documentation, and screenshot gallery under `images/`.
+- Release packaging now uses the actual binary/package name: `aimon`.
 
-### 2. **Manual Release Process**
-Step by step control:
-```bash
-# Build release package
-make package
+## Download Assets
 
-# Test the release
-make test-release
+The release workflow publishes these macOS artifacts:
 
-# Create GitHub release (requires gh CLI)
-make github-release
-```
-
-### 3. **Individual Scripts**
-For fine-grained control:
-```bash
-# Build optimized release
-./scripts/build-release.sh
-
-# Test the binary
-./scripts/test-release.sh
-
-# Create GitHub release
-./scripts/github-release.sh
-```
-
-## 🛠 Available Make Targets
-
-```bash
-make help           # Show all available targets
-make build          # Build debug version
-make release        # Build optimized release
-make test           # Run tests
-make test-release   # Test release binary
-make clean          # Clean build artifacts
-make install        # Install locally (requires sudo)
-make uninstall      # Remove from system
-make package        # Create distribution package
-make github-release # Create GitHub release
-make all            # Build, test, and package
-make dev-run        # Run development version
-make release-run    # Run release version
-```
-
-## 🤖 Automated CI/CD
-
-### GitHub Actions Workflows
-
-1. **CI Workflow** (`.github/workflows/ci.yml`)
-   - Triggers on: Push to main/develop, Pull Requests
-   - Actions: Format check, Clippy, Tests, Build verification
-
-2. **Release Workflow** (`.github/workflows/release.yml`)
-   - Triggers on: Git tags (v*), Manual dispatch
-   - Actions: Build, Test, Package, Create GitHub Release
-
-### Automatic Release Process
-When you push a tag like `v0.2.1`:
-1. 🔨 GitHub Actions builds the release
-2. 🧪 Runs all tests
-3. 📦 Creates distribution packages
-4. 🚀 Publishes GitHub release with assets
-5. ✅ Ready for download!
-
-
-
-## 📁 Release Artifacts
-
-Each release creates:
-```
+```text
 dist/
-├── system-alert-v0.2.1-macos.tar.gz     # Main distribution
-└── system-alert-v0.2.1-checksums.txt    # SHA256 checksums
-
-release-builds/
-├── system-alert                          # Binary
-├── README.txt                           # Installation guide
-├── install.sh                           # Installation script
-└── uninstall.sh                         # Uninstall script
+├── aimon-v1.0.0-macos.tar.gz
+└── aimon-v1.0.0-checksums.txt
 ```
 
-## 🔐 Security
+The archive contains:
 
-- All releases include SHA256 checksums
-- Binaries are built in clean GitHub Actions environment
-- No secrets or credentials in build process
-- Reproducible builds with locked dependencies
+```text
+aimon
+README.txt
+install.sh
+uninstall.sh
+```
 
-## 🎯 Quick Start for Users
+## Install
 
-Users can install with:
 ```bash
-# Download latest release
-curl -L -o system-alert.tar.gz https://github.com/yourusername/system-alert/releases/latest/download/system-alert-v0.2.1-macos.tar.gz
-
-# Extract and install
-tar -xzf system-alert.tar.gz
-cd system-alert-*
+# Download `aimon-v1.0.0-macos.tar.gz` from this release's Assets first.
+tar -xzf aimon-v1.0.0-macos.tar.gz
 ./install.sh
-
-# Run
-sudo system-alert
 ```
 
-## 📊 Version 0.2.1 Features
-
-✅ **Bilingual README** (English + Chinese)
-✅ **Screenshot gallery** added to documentation
-✅ **Apache License 2.0** licensing cleanup
-✅ **Image reorganization** for layout screenshots
-✅ **UI/component polishing** in startup and components renderer
-✅ **Serial number masking** simplified for short identifiers
-✅ **Dependency updates** via Cargo.lock refresh
-✅ **Carbon/efficiency advisor** rendering continued
-✅ **Headless output paths validated** (json/csv/prometheus)
-✅ **Main async loop stabilized** after refactor
-✅ **Release automation maintained** for CI/CD pipelines
-
----
-
-## 🔧 Development Workflow
+Run with full `powermetrics` access:
 
 ```bash
-# Daily development
-make dev            # Clean, build, test
-make dev-run        # Run development version
-
-# Pre-release testing
-make release-cycle  # Full release build and test
-
-# Release
-./scripts/quick-release.sh  # One-command release
+sudo aimon
 ```
 
-## 📋 Migration from 0.2.0
+Run without root if you only need normal-user metrics:
 
-- No breaking API changes in this patch
-- `config.toml` format remains compatible
-- `--lang en|zh` and theme behavior unchanged
-- Screenshots now available under `images/`
+```bash
+aimon
+```
 
-## 🐛 Fixed in 0.2.1
+## Verify
 
-- Startup page serial masking logic for length <= 4
-- Theme/image asset naming consistency
-- Docs and license alignment
-- CI artifact references updated
+```bash
+# Download `aimon-v1.0.0-checksums.txt` from this release's Assets first.
+shasum -a 256 -c aimon-v1.0.0-checksums.txt
+```
 
----
+## Requirements
 
-🎉 **Ready to release System Alert v0.2.1!**
+- macOS; the collectors rely on macOS system commands and APIs.
+- Apple Silicon is the primary target for power and thermal metrics.
+- `sudo` is recommended for complete `powermetrics` data.
+- A modern terminal with Unicode support is recommended for best TUI rendering.
 
-Choose your preferred method and let the automation handle the rest!
+## CLI Quick Reference
+
+```bash
+aimon [options]
+
+Options:
+  -r, --refresh <SECONDS>     Refresh interval in seconds
+      --refresh-ms <MILLIS>   Refresh interval in milliseconds; overrides --refresh
+  -m, --minimal               Start in minimal display mode
+  -c, --config <FILE>         Load a custom TOML config file
+  -t, --theme <THEME>         Set initial theme
+      --lang <LANG>           Set language value used by supported text paths: en, zh
+      --json                  Output one JSON snapshot and exit
+      --csv                   Output one CSV snapshot and exit
+      --stream <FORMAT>       Stream output: json, csv, prometheus
+  -h, --help                  Show help
+  -V, --version               Show version
+```
+
+## Known Limits
+
+- Complete power data depends on `powermetrics` permissions and availability.
+- Some sensors are unavailable on certain Mac models or macOS versions.
+- Per-process Wh is an estimate based on process CPU share and sampled package power, not a hardware-metered per-process reading.
+- Battery runtime prediction is based on recent power draw and battery percentage, so it should be treated as an estimate.
+- Small terminals may truncate some panels.
+
+## Release Automation
+
+- `.github/workflows/release.yml` builds on macOS when a `v*` tag is pushed or when manually dispatched.
+- The workflow runs tests, builds the release binary, tests the binary, packages the archive, and publishes GitHub Release assets.
+- GitHub Release notes are read directly from this `RELEASE.md` file.
+- Local packaging can be run with `./scripts/build-release.sh` or `make package`.
+
+## Inspiration And Licensing
+
+Aimon is inspired by the excellent `mactop` project: https://github.com/metaspartan/mactop
+
+`mactop` is distributed under the MIT License. Aimon is an independent Rust project and uses its own codebase and licensing (`MIT OR Apache-2.0` as declared in `Cargo.toml`). This attribution is included to clearly acknowledge the inspiration and upstream project.

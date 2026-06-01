@@ -1,4 +1,4 @@
-# System Alert
+# Aimon
 
 [English README](README.md)
 
@@ -44,7 +44,7 @@ AIMON 是一个用 Rust 编写的 macOS 终端系统监控工具。它偏向 App
 
 ```bash
 cargo build --release
-sudo ./target/release/system-alert
+sudo ./target/release/aimon
 ```
 
 开发运行：
@@ -62,7 +62,7 @@ cargo run
 ## CLI 参数
 
 ```bash
-system-alert [options]
+aimon [options]
 
 Options:
   -r, --refresh <SECONDS>     刷新间隔，单位秒
@@ -197,6 +197,10 @@ cooldown_seconds = 30
 - 无界面 JSON/API 输出可能仍包含 `SystemData` 暴露的字段；公开日志前请先检查输出。
 - 正常监控不需要网络访问，工具读取的是本机系统指标。
 
+## 灵感来源
+
+Aimon 的灵感来自优秀的 [`mactop`](https://github.com/metaspartan/mactop) 项目。`mactop` 使用 MIT 协议发布；Aimon 是独立的 Rust 项目，这里明确标注用于致谢和说明灵感来源。
+
 ## 限制
 
 - 完整功耗数据依赖 macOS `powermetrics` 的权限和可用性。
@@ -245,4 +249,4 @@ src/
 
 ## 许可证
 
-见 `LICENSE`。
+Apache 2.0
