@@ -1,6 +1,6 @@
 # System Alert
 
-[English README](ReadME.md)
+[English README](README.md)
 
 AIMON 是一个用 Rust 编写的 macOS 终端系统监控工具。它偏向 Apple Silicon 机器，主要在 TUI 中展示实时 CPU、内存、电池、温度、进程、网络、磁盘、功耗、能耗和碳排估算信息。
 
@@ -17,6 +17,22 @@ AIMON 是一个用 Rust 编写的 macOS 终端系统监控工具。它偏向 App
 - 主题切换和 TOML 配置。
 
 部分数值是估算值。进程级能耗是根据进程 CPU 占比和 package power 估算出来的，适合在本次运行中做相对比较，但不是硬件直接提供的单进程电表读数。
+
+## 截图
+
+| 布局 | 预览 |
+| --- | --- |
+| 启动页 (`0`) | ![启动页](images/0.png) |
+| Full 布局 (`1`) | ![Full](images/1.png) |
+| Advanced 布局 (`2`) | ![Advanced](images/2.png) |
+| Minimal 布局 (`3`) | ![Minimal](images/3.png) |
+| Compact 布局 (`4`) | ![Compact](images/4.png) |
+| Battery 布局 (`5`) | ![Battery](images/5.png) |
+| GPU 布局 (`6`) | ![GPU](images/6.png) |
+| Network 布局 (`7`) | ![Network](images/7.png) |
+| System Health 布局 (`8`) | ![System Health](images/8.png) |
+| Thermal 布局 (`9`) | ![Thermal](images/9.png) |
+| 本次运行报告 / 退出页 | ![本次运行报告](images/exit.png) |
 
 ## 环境要求
 

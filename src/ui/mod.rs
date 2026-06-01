@@ -515,25 +515,18 @@ fn mask_serial_number(serial: &str) -> String {
     }
 
     let chars: Vec<char> = serial.chars().collect();
-    let hash = short_serial_hash(serial);
     if chars.len() <= 4 {
-        return format!(
-            "{}#{}{}",
-            chars.first().copied().unwrap_or_default(),
-            hash,
-            chars.last().copied().unwrap_or_default()
-        );
+        return serial.to_string();
     }
 
-    let prefix: String = chars.iter().take(2).collect();
-    let suffix: String = chars
+    let prefix = chars.iter().take(2).collect::<String>();
+    let suffix = chars
         .iter()
-        .rev()
-        .take(2)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
+        .skip(chars.len().saturating_sub(2))
+        .collect::<String>();
+    let middle = chars[2..chars.len() - 2].iter().collect::<String>();
+    let hash = short_serial_hash(&middle);
+
     format!("{}#{}#{}", prefix, hash, suffix)
 }
 
@@ -601,4 +594,32 @@ fn read_serial_number() -> Option<String> {
         .and_then(|(_, value)| value.split_once('=').map(|(_, value)| value))
         .map(|value| value.trim().trim_matches('"').to_string())
         .filter(|value| !value.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mask_serial_number() {
+        // Test empty/unknown
+        assert_eq!(mask_serial_number(""), "Unknown");
+        assert_eq!(mask_serial_number("unknown"), "Unknown");
+
+        // Test short serial
+        assert_eq!(mask_serial_number("A"), "A");
+        assert_eq!(mask_serial_number("ABCD"), "ABCD");
+
+        // Test normal serial (format: first 2 chars + # + 6-char hex hash + last 2 chars)
+        let masked = mask_serial_number("C02X12345678");
+        assert!(masked.starts_with("C0"));
+        assert!(masked.ends_with("78"));
+        assert_eq!(masked.matches('#').count(), 2);
+
+        let parts: Vec<&str> = masked.split('#').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], "C0");
+        assert_eq!(parts[2], "78");
+        assert_eq!(parts[1].len(), 6); // short_serial_hash returns 6 hex chars
+    }
 }

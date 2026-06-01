@@ -39,7 +39,7 @@ pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme
 
     let header_line = Line::from(vec![
         Span::styled(
-            " MACTOP++ ",
+            " AIMON ",
             Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
         ),
         Span::styled(

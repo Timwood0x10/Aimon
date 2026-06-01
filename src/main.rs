@@ -1,4 +1,4 @@
-use Aimon::{
+use aimon::{
     cli::{check_root, handle_input, parse_args, InputEvent},
     collectors::DataCollector,
     config::{Config, ProcessSortBy},
@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Handle headless/API modes before UI initialization
     if cli_args.json_output {
-        let mut exporter = Aimon::api::HeadlessExporter::new();
+        let mut exporter = aimon::api::HeadlessExporter::new();
         match exporter.export_json().await {
             Ok(output) => {
                 println!("{}", output);
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if cli_args.csv_output {
-        let mut exporter = Aimon::api::HeadlessExporter::new();
+        let mut exporter = aimon::api::HeadlessExporter::new();
         match exporter.export_csv().await {
             Ok(output) => {
                 print!("{}", output);
@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(ref format_str) = cli_args.stream_format {
-        match Aimon::api::OutputFormat::parse_str(format_str) {
+        match aimon::api::OutputFormat::parse_str(format_str) {
             Some(format) => {
                 let interval_secs = cli_args.refresh_rate.unwrap_or(1);
                 let interval_ms = cli_args.refresh_rate_ms.unwrap_or(0);
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     interval_secs * 1000
                 };
                 if let Err(e) =
-                    Aimon::api::HeadlessExporter::export_stream(interval_val, format).await
+                    aimon::api::HeadlessExporter::export_stream(interval_val, format).await
                 {
                     eprintln!("Stream error: {}", e);
                     std::process::exit(1);
@@ -280,7 +280,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         true
                     }
                     Some(InputEvent::CycleTheme) => {
-                        let themes = Aimon::ui::theme::Theme::all_themes();
+                        let themes = aimon::ui::theme::Theme::all_themes();
                         let current_index = themes.iter().position(|&t| t == config.display.theme).unwrap_or(0);
                         let next_index = (current_index + 1) % themes.len();
                         config.display.theme = themes[next_index].to_string();
@@ -401,7 +401,7 @@ fn create_placeholder_data() -> SystemData {
         performance_metrics: PerformanceMetrics::default(),
         system_health: SystemHealthInfo::default(),
         terminal_info: TerminalInfo::default(),
-        carbon_info: Aimon::carbon::tracker::CarbonTracker::default(),
+        carbon_info: aimon::carbon::tracker::CarbonTracker::default(),
         timestamp: Instant::now(),
     }
 }

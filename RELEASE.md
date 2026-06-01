@@ -1,6 +1,6 @@
 # 🚀 System Alert - Release Guide
 
-Complete automation for building and releasing System Alert v0.1.0
+Complete automation for building and releasing System Alert v0.2.1
 
 ## 📦 Available Release Methods
 
@@ -73,42 +73,22 @@ make release-run    # Run release version
    - Actions: Build, Test, Package, Create GitHub Release
 
 ### Automatic Release Process
-When you push a tag like `v0.1.0`:
+When you push a tag like `v0.2.1`:
 1. 🔨 GitHub Actions builds the release
 2. 🧪 Runs all tests
 3. 📦 Creates distribution packages
 4. 🚀 Publishes GitHub release with assets
 5. ✅ Ready for download!
 
-## 📋 Release Checklist
 
-### Before Release
-- [ ] All tests passing
-- [ ] Code formatted (`cargo fmt`)
-- [ ] No clippy warnings (`cargo clippy`)
-- [ ] Version updated in Cargo.toml
-- [ ] CHANGELOG.md updated
-- [ ] README.md updated if needed
-
-### Release Process
-- [ ] Run `./scripts/quick-release.sh` OR
-- [ ] Manual: `make package && make github-release`
-- [ ] Verify GitHub Actions completed successfully
-- [ ] Test download and installation
-- [ ] Update documentation if needed
-
-### After Release
-- [ ] Announce on relevant channels
-- [ ] Update any dependent projects
-- [ ] Plan next version features
 
 ## 📁 Release Artifacts
 
 Each release creates:
 ```
 dist/
-├── system-alert-v0.1.0-macos.tar.gz     # Main distribution
-└── system-alert-v0.1.0-checksums.txt    # SHA256 checksums
+├── system-alert-v0.2.1-macos.tar.gz     # Main distribution
+└── system-alert-v0.2.1-checksums.txt    # SHA256 checksums
 
 release-builds/
 ├── system-alert                          # Binary
@@ -129,7 +109,7 @@ release-builds/
 Users can install with:
 ```bash
 # Download latest release
-curl -L -o system-alert.tar.gz https://github.com/yourusername/system-alert/releases/latest/download/system-alert-v0.1.0-macos.tar.gz
+curl -L -o system-alert.tar.gz https://github.com/yourusername/system-alert/releases/latest/download/system-alert-v0.2.1-macos.tar.gz
 
 # Extract and install
 tar -xzf system-alert.tar.gz
@@ -139,6 +119,22 @@ cd system-alert-*
 # Run
 sudo system-alert
 ```
+
+## 📊 Version 0.2.1 Features
+
+✅ **Bilingual README** (English + Chinese)
+✅ **Screenshot gallery** added to documentation
+✅ **Apache License 2.0** licensing cleanup
+✅ **Image reorganization** for layout screenshots
+✅ **UI/component polishing** in startup and components renderer
+✅ **Serial number masking** simplified for short identifiers
+✅ **Dependency updates** via Cargo.lock refresh
+✅ **Carbon/efficiency advisor** rendering continued
+✅ **Headless output paths validated** (json/csv/prometheus)
+✅ **Main async loop stabilized** after refactor
+✅ **Release automation maintained** for CI/CD pipelines
+
+---
 
 ## 🔧 Development Workflow
 
@@ -154,22 +150,22 @@ make release-cycle  # Full release build and test
 ./scripts/quick-release.sh  # One-command release
 ```
 
-## 📊 Version 0.2.0 Features
+## 📋 Migration from 0.2.0
 
-✅ **Multi-theme system with 9 built-in themes**
-✅ **Interactive theme switching with 't' key**
-✅ **Command line theme selection**
-✅ **Configuration file theme persistence**
-✅ **Complete real-time monitoring**
-✅ **Advanced battery analytics** 
-✅ **Apple Silicon optimization**
-✅ **Professional documentation**
-✅ **Automated build system**
-✅ **GitHub Actions CI/CD**
-✅ **Distribution packaging**
+- No breaking API changes in this patch
+- `config.toml` format remains compatible
+- `--lang en|zh` and theme behavior unchanged
+- Screenshots now available under `images/`
+
+## 🐛 Fixed in 0.2.1
+
+- Startup page serial masking logic for length <= 4
+- Theme/image asset naming consistency
+- Docs and license alignment
+- CI artifact references updated
 
 ---
 
-🎉 **Ready to release System Alert v0.2.0!**
+🎉 **Ready to release System Alert v0.2.1!**
 
 Choose your preferred method and let the automation handle the rest!

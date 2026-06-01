@@ -18,6 +18,22 @@ This is an active local/system monitoring tool, not a polished packaged app. The
 
 Some values are estimates. Per-process energy is calculated from process CPU share and package power; it is useful for comparison during one run, but it is not a hardware-metered per-process reading.
 
+## Screenshots
+
+| Layout | Preview |
+| --- | --- |
+| Startup page (`0`) | ![Startup](images/0.png) |
+| Full layout (`1`) | ![Full](images/1.png) |
+| Advanced layout (`2`) | ![Advanced](images/2.png) |
+| Minimal layout (`3`) | ![Minimal](images/3.png) |
+| Compact layout (`4`) | ![Compact](images/4.png) |
+| Battery layout (`5`) | ![Battery](images/5.png) |
+| GPU layout (`6`) | ![GPU](images/6.png) |
+| Network layout (`7`) | ![Network](images/7.png) |
+| System health layout (`8`) | ![System health](images/8.png) |
+| Thermal layout (`9`) | ![Thermal](images/9.png) |
+| Session report / exit screen | ![Session report](images/exit.png) |
+
 ## Requirements
 
 - macOS. The project is designed around macOS system commands and Apple Silicon metrics.
