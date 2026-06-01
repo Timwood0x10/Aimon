@@ -4,11 +4,7 @@ use termion::{
     event::{Event, Key},
     input::TermRead,
 };
-use tokio::{
-    process::Command as tokio_comm,
-    sync::mpsc as tokio_mpsc,
-    time::{timeout, Duration},
-};
+use tokio::sync::mpsc as tokio_mpsc;
 
 #[derive(Debug)]
 pub struct CliArgs {
@@ -22,6 +18,8 @@ pub struct CliArgs {
     pub json_output: bool,
     pub csv_output: bool,
     pub stream_format: Option<String>,
+    /// Allow experimental fan control (requires SMC write access, feature gate)
+    pub allow_fan_control: bool,
 }
 
 pub fn parse_args() -> CliArgs {
@@ -90,6 +88,12 @@ pub fn parse_args() -> CliArgs {
                 .value_name("FORMAT")
                 .help("Continuous output in given format (json, csv, prometheus)"),
         )
+        .arg(
+            Arg::new("allow-fan-control")
+                .long("allow-fan-control")
+                .help("Enable experimental fan control (requires SMC write access, compile with fan-control feature)")
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
 
     CliArgs {
@@ -102,6 +106,7 @@ pub fn parse_args() -> CliArgs {
         json_output: matches.get_flag("json"),
         csv_output: matches.get_flag("csv"),
         stream_format: matches.get_one::<String>("stream").cloned(),
+        allow_fan_control: matches.get_flag("allow-fan-control"),
     }
 }
 
@@ -110,31 +115,6 @@ pub async fn check_root() -> Result<(), Box<dyn std::error::Error>> {
         return Err("This program requires root privileges to access system metrics.".into());
     }
     Ok(())
-}
-
-pub async fn get_powermetrics_output() -> Result<String, Box<dyn std::error::Error>> {
-    let powermetrics_future = tokio_comm::new("powermetrics")
-        .arg("-n")
-        .arg("1")
-        .arg("--samplers")
-        .arg("cpu_power,gpu_power")
-        .output();
-
-    // Add 5 second timeout to prevent infinite waiting - this fixes potential deadlock
-    match timeout(Duration::from_secs(5), powermetrics_future).await {
-        Ok(Ok(output)) => {
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to run powermetrics: {}", stderr).into());
-            }
-            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-        }
-        Ok(Err(e)) => Err(format!("Failed to execute powermetrics: {}", e).into()),
-        Err(_) => Err(
-            "Powermetrics command timed out after 5 seconds - this may indicate a system issue"
-                .into(),
-        ),
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -170,7 +150,7 @@ pub enum InputEvent {
     ToggleTimeTravel,
     /// Toggle achievements display
     ToggleAchievements,
-    /// Jump to a specific layout by number (0-9)
+    /// Jump to a specific layout by number (0-9) or named shortcut
     JumpToLayout(u8),
     /// Search processes (/)
     SearchProcess,
@@ -217,6 +197,7 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
                 Event::Key(Key::Char('7')) => Some(InputEvent::JumpToLayout(7)),
                 Event::Key(Key::Char('8')) => Some(InputEvent::JumpToLayout(8)),
                 Event::Key(Key::Char('9')) => Some(InputEvent::JumpToLayout(9)),
+                Event::Key(Key::Char('d')) => Some(InputEvent::JumpToLayout(10)),
                 Event::Key(Key::Char('\n')) | Event::Key(Key::Char(' ')) => {
                     Some(InputEvent::JumpToLayout(1))
                 }

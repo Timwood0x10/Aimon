@@ -102,6 +102,7 @@ cargo run -- --stream prometheus
 | `7` | Network 布局 |
 | `8` | System Health 布局 |
 | `9` | Thermal 布局 |
+| `d` | Storage 布局 |
 | `h` / `←` | 上一个布局 |
 | `l` / `→` / `Tab` | 下一个布局 |
 | `j` / `↓` | 向下滚动 |
@@ -128,6 +129,28 @@ cargo run -- --stream prometheus
 - **Efficiency Advisor**：提示高 idle power，并展示最近异常采样。
 - **Session Report**：展示运行时长、总 Wh、CO₂ 估算、平均/峰值功耗、异常次数和估算能耗最高进程。
 - **电池续航估算**：放电状态下，根据最近功耗和电量估算剩余时间。
+- **Storage 页面**：展示挂载点容量条、文件系统/可移除标记、磁盘 I/O、容量趋势，以及单次 Top 目录扫描。若系统安装了 `dust` 则优先使用；否则回退到内置有界扫描器。
+
+## 数据来源
+
+Aimon 使用分层采集架构。稳定的公开命令行工具仍作为 fallback；原生 macOS 后端在更多 Apple Silicon 机器验证前都按实验能力处理：
+
+- `sysinfo`：CPU 使用率、进程、内存、网络接口、系统元数据，以及系统暴露出的组件温度。
+- `powermetrics`：解析 CPU/GPU/ANE/package 功耗，以及 CPU residency/frequency；完整数据通常需要 `sudo`。
+- Mach `host_processor_info`：在 macOS 上可用时采集原生 per-core CPU 使用率。
+- IOReport：实验性无 sudo CPU/GPU/ANE/DRAM 功耗采样，依赖可匹配的 channel。
+- Apple SMC：实验性温度和风扇枚举；SMCWrite 风扇模式和目标转速写入受 `fan-control` Cargo feature、配置启用和 `--allow-fan-control` 共同保护。
+- IOKit IORegistry：实验性读取 Apple GPU 核心数、最高频率和平台暴露的频率表。
+- NSProcessInfo.thermalState：通过 Foundation 获取原生热状态。
+- `sysctl`：热压力、机型/CPU 元数据和部分 fallback 检测。
+- `system_profiler`、`ioreg` 和 `pmset`：GPU 型号信息，以及电池/充电器/容量信息。
+- `iostat`：磁盘 I/O 采样。
+- `sysinfo::Disks`：挂载卷磁盘容量和使用率。
+- 可选 `dust`：用于 Storage 页的单次 Top 目录大小扫描；不可用或超时时会使用内置有界扫描器。
+
+IOHIDEventSystemClient 温度 fallback 仍属实验能力。默认构建不会写风扇设置；写入必须使用 `--features fan-control` 编译、设置 `fan_control.enabled = true`，并在运行时传入 `--allow-fan-control`。
+
+具体到采集器、数据结构和每一步开发任务的实现计划见 `docs/data-collection-roadmap.md`。
 
 ## 无界面输出
 

@@ -8,6 +8,7 @@ pub mod full;
 pub mod gpu_focus;
 pub mod minimal;
 pub mod network_focus;
+pub mod storage;
 pub mod system_health;
 pub mod thermals;
 
@@ -38,6 +39,8 @@ pub enum LayoutType {
     Advanced,
     /// Thermals and fan monitoring focus
     Thermals,
+    /// Storage capacity, directory usage, and disk I/O focus
+    Storage,
 }
 
 impl LayoutType {
@@ -54,6 +57,7 @@ impl LayoutType {
             LayoutType::NetworkFocus,
             LayoutType::SystemHealth,
             LayoutType::Thermals,
+            LayoutType::Storage,
         ]
     }
 
@@ -70,6 +74,7 @@ impl LayoutType {
             LayoutType::NetworkFocus => 7,
             LayoutType::SystemHealth => 8,
             LayoutType::Thermals => 9,
+            LayoutType::Storage => 10,
         }
     }
 
@@ -86,6 +91,7 @@ impl LayoutType {
             7 => Some(LayoutType::NetworkFocus),
             8 => Some(LayoutType::SystemHealth),
             9 => Some(LayoutType::Thermals),
+            10 => Some(LayoutType::Storage),
             _ => None,
         }
     }
@@ -104,6 +110,7 @@ impl fmt::Display for LayoutType {
             LayoutType::NetworkFocus => write!(f, "Network"),
             LayoutType::SystemHealth => write!(f, "Health"),
             LayoutType::Thermals => write!(f, "Thermals"),
+            LayoutType::Storage => write!(f, "Storage"),
         }
     }
 }
@@ -123,6 +130,7 @@ impl FromStr for LayoutType {
             "network" | "net" => Ok(LayoutType::NetworkFocus),
             "health" | "system_health" => Ok(LayoutType::SystemHealth),
             "thermals" | "thermal" | "fan" => Ok(LayoutType::Thermals),
+            "storage" | "disk" | "disks" => Ok(LayoutType::Storage),
             _ => Err(format!("Unknown layout type: {}", s)),
         }
     }
@@ -153,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_layout_type_all_count() {
-        assert_eq!(LayoutType::all().len(), 10);
+        assert_eq!(LayoutType::all().len(), 11);
     }
 
     #[test]
@@ -166,6 +174,7 @@ mod tests {
         assert_eq!(LayoutType::GpuFocus.to_string(), "GPU");
         assert_eq!(LayoutType::NetworkFocus.to_string(), "Network");
         assert_eq!(LayoutType::SystemHealth.to_string(), "Health");
+        assert_eq!(LayoutType::Storage.to_string(), "Storage");
     }
 
     #[test]
@@ -205,6 +214,10 @@ mod tests {
             LayoutType::from_str("health").unwrap(),
             LayoutType::SystemHealth
         );
+        assert_eq!(
+            LayoutType::from_str("storage").unwrap(),
+            LayoutType::Storage
+        );
         assert!(LayoutType::from_str("invalid").is_err());
     }
 
@@ -213,7 +226,8 @@ mod tests {
         assert_eq!(LayoutType::from_key_number(0), Some(LayoutType::Startup));
         assert_eq!(LayoutType::from_key_number(1), Some(LayoutType::Full));
         assert_eq!(LayoutType::from_key_number(9), Some(LayoutType::Thermals));
-        assert_eq!(LayoutType::from_key_number(10), None);
+        assert_eq!(LayoutType::from_key_number(10), Some(LayoutType::Storage));
+        assert_eq!(LayoutType::from_key_number(11), None);
     }
 
     #[test]
@@ -221,5 +235,6 @@ mod tests {
         assert_eq!(LayoutType::Startup.key_number(), 0);
         assert_eq!(LayoutType::Full.key_number(), 1);
         assert_eq!(LayoutType::SystemHealth.key_number(), 8);
+        assert_eq!(LayoutType::Storage.key_number(), 10);
     }
 }

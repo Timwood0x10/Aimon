@@ -27,7 +27,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::process::Command;
-use sysinfo::System;
+use sysinfo::{Disks, System};
 use termion::raw::IntoRawMode;
 
 use self::party_mode::PartyMode;
@@ -192,6 +192,9 @@ impl UI {
                 LayoutType::Thermals => {
                     layouts::thermals::draw(f, data, history, config, theme);
                 }
+                LayoutType::Storage => {
+                    layouts::storage::draw(f, data, history, theme);
+                }
             }
 
             // Draw help overlay on top if active
@@ -329,13 +332,21 @@ struct StartupSummary {
     cpu_arch: String,
     cpu_brand: String,
     cpu_cores: usize,
-    cpu_frequency_mhz: u64,
     memory_gb: f64,
     used_memory_gb: f64,
     uptime_seconds: u64,
     serial_number: String,
+    primary_disk: Option<StartupDiskSummary>,
+    max_fan_rpm: Option<u32>,
     is_root: bool,
     has_battery_hint: bool,
+}
+
+struct StartupDiskSummary {
+    mount_point: String,
+    used_gb: f64,
+    total_gb: f64,
+    usage_percentage: f32,
 }
 
 impl StartupSummary {
@@ -357,15 +368,12 @@ impl StartupSummary {
             cpu_arch: System::cpu_arch().unwrap_or_else(|| "Unknown".to_string()),
             cpu_brand,
             cpu_cores: system.cpus().len(),
-            cpu_frequency_mhz: system
-                .cpus()
-                .first()
-                .map(|cpu| cpu.frequency())
-                .unwrap_or(0),
             memory_gb: system.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0,
             used_memory_gb: system.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0,
             uptime_seconds: System::uptime(),
             serial_number: read_serial_number().unwrap_or_else(|| "Unknown".to_string()),
+            primary_disk: read_startup_primary_disk(),
+            max_fan_rpm: read_startup_max_fan_rpm(),
             is_root: unsafe { libc::geteuid() == 0 },
             has_battery_hint: Command::new("pmset")
                 .arg("-g")
@@ -425,7 +433,7 @@ fn build_startup_dashboard_lines(summary: &StartupSummary, theme: &Theme) -> Vec
         startup_kv("CPU", &summary.cpu_brand),
         startup_kv("Arch", &summary.cpu_arch),
         startup_kv("Cores", &format!("{} logical", summary.cpu_cores)),
-        startup_kv("Clock", &format!("{} MHz", summary.cpu_frequency_mhz)),
+        startup_kv("Fans", &format_startup_fans(summary.max_fan_rpm)),
         startup_kv(
             "Memory",
             &format!(
@@ -433,6 +441,7 @@ fn build_startup_dashboard_lines(summary: &StartupSummary, theme: &Theme) -> Vec
                 summary.used_memory_gb, summary.memory_gb
             ),
         ),
+        startup_kv("Disk", &format_startup_disk(summary.primary_disk.as_ref())),
         startup_kv(
             "Power",
             &format!(
@@ -448,6 +457,7 @@ fn build_startup_dashboard_lines(summary: &StartupSummary, theme: &Theme) -> Vec
         ("snapshot", summary.cpu_cores > 0),
         ("powermetrics", summary.is_root),
         ("battery", summary.has_battery_hint),
+        ("disk", summary.primary_disk.is_some()),
     ];
     let check_line = checks
         .iter()
@@ -537,8 +547,8 @@ fn short_serial_hash(serial: &str) -> String {
 }
 
 fn centered_startup_area(area: Rect) -> Rect {
-    let width = area.width.saturating_sub(2).min(110).max(40);
-    let height = area.height.saturating_sub(2).min(30).max(12);
+    let width = area.width.saturating_sub(2).clamp(40, 110);
+    let height = area.height.saturating_sub(2).clamp(12, 30);
     let x = area.x + area.width.saturating_sub(width) / 2;
     let y = area.y + area.height.saturating_sub(height) / 2;
 
@@ -572,6 +582,56 @@ fn format_startup_uptime(seconds: u64) -> String {
         format!("{}h {}m", hours, minutes)
     } else {
         format!("{}m", minutes)
+    }
+}
+
+fn format_startup_disk(disk: Option<&StartupDiskSummary>) -> String {
+    disk.map(|disk| {
+        format!(
+            "{:.0}/{:.0} GiB used ({:.0}%) on {}",
+            disk.used_gb, disk.total_gb, disk.usage_percentage, disk.mount_point
+        )
+    })
+    .unwrap_or_else(|| "unavailable".to_string())
+}
+
+fn format_startup_fans(max_fan_rpm: Option<u32>) -> String {
+    max_fan_rpm
+        .map(|rpm| format!("{} RPM max", rpm))
+        .unwrap_or_else(|| "unavailable".to_string())
+}
+
+fn read_startup_primary_disk() -> Option<StartupDiskSummary> {
+    let disks = Disks::new_with_refreshed_list();
+    let disk = disks
+        .iter()
+        .find(|disk| disk.mount_point().to_string_lossy() == "/")
+        .or_else(|| disks.iter().next())?;
+    let total_bytes = disk.total_space();
+    if total_bytes == 0 {
+        return None;
+    }
+    let used_bytes = total_bytes.saturating_sub(disk.available_space());
+    Some(StartupDiskSummary {
+        mount_point: disk.mount_point().to_string_lossy().to_string(),
+        used_gb: used_bytes as f64 / 1024.0 / 1024.0 / 1024.0,
+        total_gb: total_bytes as f64 / 1024.0 / 1024.0 / 1024.0,
+        usage_percentage: used_bytes as f32 / total_bytes as f32 * 100.0,
+    })
+}
+
+fn read_startup_max_fan_rpm() -> Option<u32> {
+    #[cfg(target_os = "macos")]
+    {
+        crate::collectors::backends::read_smc_fans()
+            .into_iter()
+            .map(|fan| fan.current_rpm)
+            .max()
+            .filter(|rpm| *rpm > 0)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
     }
 }
 
@@ -621,5 +681,21 @@ mod tests {
         assert_eq!(parts[0], "C0");
         assert_eq!(parts[2], "78");
         assert_eq!(parts[1].len(), 6); // short_serial_hash returns 6 hex chars
+    }
+
+    #[test]
+    fn test_format_startup_disk_is_readable() {
+        let disk = StartupDiskSummary {
+            mount_point: "/".to_string(),
+            used_gb: 499.0,
+            total_gb: 926.0,
+            usage_percentage: 54.0,
+        };
+
+        assert_eq!(
+            format_startup_disk(Some(&disk)),
+            "499/926 GiB used (54%) on /",
+            "startup disk summary should avoid duplicate mount/percent wording"
+        );
     }
 }

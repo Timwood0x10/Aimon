@@ -57,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cli_args.minimal_mode,
         cli_args.theme.as_deref(),
     );
+    config.merge_fan_control(cli_args.allow_fan_control);
 
     // Handle headless/API modes before UI initialization
     if cli_args.json_output {
@@ -147,10 +148,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config.refresh_rate * 1000
         };
         let refresh_duration = Duration::from_millis(refresh_ms);
+        let fan_control = config.fan_control.clone();
 
         std::thread::spawn(move || {
             runtime_handle.block_on(async move {
-                let mut collector = DataCollector::new_fast();
+                let mut collector = DataCollector::new_fast().with_fan_control(fan_control);
                 let mut tick = interval(refresh_duration);
                 loop {
                     match collector.collect_all_data().await {
@@ -379,12 +381,16 @@ fn create_placeholder_data() -> SystemData {
             core_usages: vec![0.0; 8],
             average_usage: 0.0,
             power_metrics: CPUMetrics::default(),
+            usage_meta: MetricMeta::unavailable(),
+            power_meta: MetricMeta::unavailable(),
         },
         gpu_info: GpuInfo::default(),
         ane_info: AneInfo::default(),
         dram_info: DramInfo::default(),
         thunderbolt_info: ThunderboltInfo::default(),
         disk_io_info: DiskIoInfo::default(),
+        disk_usage_info: Vec::new(),
+        directory_usage_info: Vec::new(),
         memory_info: MemoryInfo {
             total_memory: 0,
             used_memory: 0,
@@ -402,6 +408,7 @@ fn create_placeholder_data() -> SystemData {
         system_health: SystemHealthInfo::default(),
         terminal_info: TerminalInfo::default(),
         carbon_info: aimon::carbon::tracker::CarbonTracker::default(),
+        capabilities: aimon::collectors::capabilities::CollectorCapabilities::default(),
         timestamp: Instant::now(),
     }
 }

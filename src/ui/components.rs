@@ -14,10 +14,54 @@ use super::theme::Theme;
 use crate::config::{Config, ProcessSortBy};
 use crate::history::HistoryData;
 use crate::types::*;
+use std::fmt::Write;
+
+/// Build a compact source label string from MetricMeta, e.g. "[PWR:Powermetrics]"
+fn source_badge(meta: &MetricMeta) -> String {
+    let mut label = String::new();
+    write!(label, "[{}:{}", meta.source, meta.confidence).ok();
+    if let Some(ref detail) = meta.detail {
+        write!(label, " {}", detail).ok();
+    }
+    label.push(']');
+    label
+}
 
 /// Base style with theme foreground and background applied to all content
 fn base_style(theme: &Theme) -> Style {
     Style::default().fg(theme.fg).bg(theme.bg)
+}
+
+pub fn format_storage_bytes(bytes: u64) -> String {
+    const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
+    const TIB: f64 = GIB * 1024.0;
+    let value = bytes as f64;
+    if value >= TIB {
+        format!("{:.1} TiB", value / TIB)
+    } else if value >= GIB {
+        format!("{:.1} GiB", value / GIB)
+    } else {
+        format!("{:.0} MiB", value / 1024.0 / 1024.0)
+    }
+}
+
+fn primary_disk_usage(data: &SystemData) -> Option<&DiskUsageInfo> {
+    data.disk_usage_info
+        .iter()
+        .find(|disk| disk.mount_point == "/")
+        .or_else(|| data.disk_usage_info.first())
+}
+
+fn truncate_panel_field(value: &str, max_len: usize) -> String {
+    if value.chars().count() <= max_len {
+        return value.to_string();
+    }
+    let mut truncated = value
+        .chars()
+        .take(max_len.saturating_sub(1))
+        .collect::<String>();
+    truncated.push('…');
+    truncated
 }
 
 fn panel_block(title: &str, _color: Color, theme: &Theme) -> Block<'static> {
@@ -264,6 +308,10 @@ pub fn render_power_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &
             Style::default()
                 .fg(theme.accent)
                 .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!("     {}", source_badge(&data.cpu_info.power_meta)),
+            Style::default().fg(Color::DarkGray),
         )),
         Line::from(""),
         Line::from(Span::styled(
@@ -524,6 +572,10 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
     };
 
     let lines = vec![
+        Line::from(vec![Span::styled(
+            format!("     {}", source_badge(&data.thermal_info.state_meta)),
+            Style::default().fg(Color::DarkGray),
+        )]),
         Line::from(vec![
             Span::styled("Pressure: ", Style::default().fg(theme.fg)),
             Span::styled(
@@ -560,6 +612,13 @@ pub fn render_thermal_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
                     .map(|rpm| format!("{} RPM", rpm))
                     .unwrap_or_else(|| "Unavailable".to_string()),
                 Style::default().fg(theme.fg),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Fan Ctrl: ", Style::default().fg(theme.fg)),
+            Span::styled(
+                thermal.fan_control_status.clone(),
+                Style::default().fg(Color::DarkGray),
             ),
         ]),
     ];
@@ -1041,17 +1100,29 @@ pub fn render_detailed_temperatures(f: &mut Frame, area: Rect, data: &SystemData
                 .add_modifier(Modifier::BOLD),
         )));
 
-        for (i, speed) in thermal.fan_speeds.iter().enumerate() {
+        lines.push(Line::from(Span::styled(
+            format!("    Control: {}", thermal.fan_control_status),
+            Style::default().fg(Color::DarkGray),
+        )));
+
+        for fan in &thermal.fans {
             lines.push(Line::from(vec![
                 Span::styled(
-                    format!("    Fan {}: ", i + 1),
+                    format!("    Fan {}: ", fan.id + 1),
                     Style::default().fg(theme.fg),
                 ),
                 Span::styled(
-                    format!("{} RPM", speed),
+                    format!("{} RPM", fan.current_rpm),
                     Style::default()
                         .fg(theme.cpu_color)
                         .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        " target {} [{}-{}] {}",
+                        fan.target_rpm, fan.min_rpm, fan.max_rpm, fan.mode
+                    ),
+                    Style::default().fg(Color::DarkGray),
                 ),
             ]));
         }
@@ -1186,10 +1257,34 @@ pub fn render_gpu_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Th
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
+            format!("     {}", source_badge(&data.gpu_info.meta)),
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(Span::styled(
             format!("  ◈ Freq:  {} MHz", gpu.freq_mhz),
             Style::default().fg(theme.fg),
         )),
     ];
+
+    if gpu.max_freq_mhz > 0 {
+        lines.push(Line::from(Span::styled(
+            format!("  ◈ Max:   {} MHz", gpu.max_freq_mhz),
+            Style::default().fg(theme.fg),
+        )));
+    }
+
+    if !gpu.frequency_table_mhz.is_empty() {
+        let table = gpu
+            .frequency_table_mhz
+            .iter()
+            .map(|freq| freq.to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        lines.push(Line::from(Span::styled(
+            format!("  ◈ Table: {} MHz", table),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
 
     if gpu.core_count > 0 {
         lines.push(Line::from(Span::styled(
@@ -1274,12 +1369,18 @@ pub fn render_dram_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &T
         }
     };
 
-    let mut lines = vec![Line::from(Span::styled(
-        format!("  ◈ Power: {:.2}W", dram.power_w),
-        Style::default()
-            .fg(theme.accent)
-            .add_modifier(Modifier::BOLD),
-    ))];
+    let mut lines = vec![
+        Line::from(Span::styled(
+            format!("  ◈ Power: {:.2}W", dram.power_w),
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!("     {}", source_badge(&data.dram_info.meta)),
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
 
     if dram.total_bytes_per_sec > 0.0 {
         lines.push(Line::from(Span::styled(
@@ -1433,6 +1534,7 @@ pub fn render_power_breakdown(f: &mut Frame, area: Rect, data: &SystemData, them
 /// Render Disk I/O panel with real-time rates
 pub fn render_disk_io_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let disk = &data.disk_io_info;
+    let primary_disk = primary_disk_usage(data);
     let format_rate = |rate: f64| -> String {
         if rate >= 1024.0 * 1024.0 {
             format!("{:.2} MB/s", rate / (1024.0 * 1024.0))
@@ -1445,7 +1547,7 @@ pub fn render_disk_io_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         }
     };
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(Span::styled(
             format!("  ↓ Read:  {}", format_rate(disk.read_bytes_per_sec)),
             Style::default()
@@ -1469,9 +1571,82 @@ pub fn render_disk_io_stats(f: &mut Frame, area: Rect, data: &SystemData, theme:
         )),
     ];
 
+    if let Some(disk_usage) = primary_disk {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  ◈ {}: {:.1}%",
+                disk_usage.mount_point, disk_usage.usage_percentage
+            ),
+            Style::default()
+                .fg(if disk_usage.usage_percentage > 90.0 {
+                    theme.critical_color
+                } else if disk_usage.usage_percentage > 75.0 {
+                    theme.warning_color
+                } else {
+                    theme.fg
+                })
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            format!(
+                "  Used {} / {}",
+                format_storage_bytes(disk_usage.used_bytes),
+                format_storage_bytes(disk_usage.total_bytes)
+            ),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
     let block = Paragraph::new(lines)
         .style(base_style(theme))
         .block(panel_block("DISK I/O", theme.mem_color, theme));
+
+    f.render_widget(block, area);
+}
+
+/// Render mounted disk capacity usage.
+pub fn render_disk_usage_stats(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
+    let mut lines = Vec::new();
+
+    if data.disk_usage_info.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No mounted disk usage available",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for disk in data.disk_usage_info.iter().take(5) {
+            let color = if disk.usage_percentage > 90.0 {
+                theme.critical_color
+            } else if disk.usage_percentage > 75.0 {
+                theme.warning_color
+            } else {
+                theme.mem_color
+            };
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("  {:<12} ", truncate_panel_field(&disk.mount_point, 12)),
+                    Style::default().fg(theme.fg),
+                ),
+                Span::styled(
+                    format!("{:>5.1}% ", disk.usage_percentage),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        "{} / {}",
+                        format_storage_bytes(disk.used_bytes),
+                        format_storage_bytes(disk.total_bytes)
+                    ),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        }
+    }
+
+    let block = Paragraph::new(lines)
+        .style(base_style(theme))
+        .block(panel_block("DISK USAGE", theme.mem_color, theme));
 
     f.render_widget(block, area);
 }

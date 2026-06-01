@@ -1,13 +1,16 @@
 //! GPU data collector
-//! Collects GPU usage, frequency, and core information using IOReport/IOKit
+//! Collects GPU usage, frequency, and core information from powermetrics,
+//! system_profiler, sysctl, and chip-model heuristics.
 
-use crate::types::GpuInfo;
+use crate::types::{GpuInfo, MetricMeta, MetricSource};
 use lazy_static::lazy_static;
 use regex::Regex;
 
 /// Collect GPU information from powermetrics and system_profiler
 pub async fn collect_gpu_info() -> GpuInfo {
     let mut gpu_info = GpuInfo::default();
+
+    merge_iokit_gpu_info(&mut gpu_info);
 
     if let Ok(output) = get_system_profiler_gpu().await {
         parse_gpu_from_profiler(&output, &mut gpu_info);
@@ -26,7 +29,30 @@ pub async fn collect_gpu_info_from_powermetrics(output: Option<&str>) -> GpuInfo
         parse_gpu_from_powermetrics(output, &mut gpu_info);
     }
 
+    merge_iokit_gpu_info(&mut gpu_info);
+
     gpu_info
+}
+
+fn merge_iokit_gpu_info(gpu_info: &mut GpuInfo) {
+    #[cfg(target_os = "macos")]
+    if let Some(iokit_info) = crate::collectors::backends::read_iokit_gpu_info() {
+        if gpu_info.core_count == 0 {
+            gpu_info.core_count = iokit_info.core_count;
+        }
+        if gpu_info.max_freq_mhz == 0 {
+            gpu_info.max_freq_mhz = iokit_info.max_freq_mhz;
+        }
+        if gpu_info.frequency_table_mhz.is_empty() {
+            gpu_info.frequency_table_mhz = iokit_info.frequency_table_mhz;
+        }
+        if gpu_info.freq_mhz == 0 {
+            gpu_info.freq_mhz = iokit_info.freq_mhz;
+        }
+        if gpu_info.meta.confidence == crate::types::MetricConfidence::Unavailable {
+            gpu_info.meta = MetricMeta::measured(MetricSource::Iokit);
+        }
+    }
 }
 
 /// Fill slower/static GPU details without invoking powermetrics again.
@@ -55,6 +81,7 @@ fn parse_gpu_from_powermetrics(output: &str, gpu_info: &mut GpuInfo) {
         if let Some(caps) = GPU_FREQ_REGEX.captures(line) {
             if let Ok(freq) = caps[1].parse::<i32>() {
                 gpu_info.freq_mhz = freq;
+                gpu_info.meta = MetricMeta::measured(MetricSource::Powermetrics);
                 if gpu_info.max_freq_mhz == 0 || freq > gpu_info.max_freq_mhz {
                     gpu_info.max_freq_mhz = freq;
                 }
@@ -64,12 +91,14 @@ fn parse_gpu_from_powermetrics(output: &str, gpu_info: &mut GpuInfo) {
         if let Some(caps) = GPU_ACTIVE_REGEX.captures(line) {
             if let Ok(usage) = caps[1].parse::<f32>() {
                 gpu_info.usage_percentage = usage;
+                gpu_info.meta = MetricMeta::measured(MetricSource::Powermetrics);
             }
         }
 
         if let Some(caps) = GPU_SRAM_REGEX.captures(line) {
             if let Ok(power) = caps[1].parse::<f64>() {
                 gpu_info.sram_power_w = power / 1000.0;
+                gpu_info.meta = MetricMeta::measured(MetricSource::Powermetrics);
             }
         }
 
@@ -79,6 +108,10 @@ fn parse_gpu_from_powermetrics(output: &str, gpu_info: &mut GpuInfo) {
                 if let Ok(freq) = freq_str.trim_end_matches("MHz").parse::<i32>() {
                     if freq > gpu_info.max_freq_mhz {
                         gpu_info.max_freq_mhz = freq;
+                    }
+                    if !gpu_info.frequency_table_mhz.contains(&freq) {
+                        gpu_info.frequency_table_mhz.push(freq);
+                        gpu_info.frequency_table_mhz.sort_unstable();
                     }
                 }
             }

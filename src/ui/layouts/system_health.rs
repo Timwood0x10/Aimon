@@ -22,6 +22,7 @@ fn create_system_health_layout(area: Rect) -> Vec<Rect> {
             Constraint::Length(3),  // Header
             Constraint::Length(10), // Uptime + Load averages
             Constraint::Length(8),  // Temperatures + Fans
+            Constraint::Length(8),  // Disk usage
             Constraint::Min(0),     // Temperature history chart
         ])
         .split(area);
@@ -37,7 +38,7 @@ fn create_system_health_layout(area: Rect) -> Vec<Rect> {
         .split(main[2]);
 
     vec![
-        main[0], top_row[0], top_row[1], mid_row[0], mid_row[1], main[3],
+        main[0], top_row[0], top_row[1], mid_row[0], mid_row[1], main[3], main[4],
     ]
 }
 
@@ -206,13 +207,18 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
 
     // Fan speeds
     let fan_lines: Vec<Line> = thermal
-        .fan_speeds
+        .fans
         .iter()
-        .enumerate()
-        .map(|(i, &rpm)| {
+        .map(|fan| {
             Line::from(vec![
-                Span::styled(format!("Fan {}: ", i), Style::default().fg(theme.fg)),
-                Span::styled(format!("{} RPM", rpm), Style::default().fg(theme.fg)),
+                Span::styled(
+                    format!("Fan {}: ", fan.id + 1),
+                    Style::default().fg(theme.fg),
+                ),
+                Span::styled(
+                    format!("{} RPM {}", fan.current_rpm, fan.mode),
+                    Style::default().fg(theme.fg),
+                ),
             ])
         })
         .collect();
@@ -241,11 +247,14 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     );
     f.render_widget(fan_block, areas[4]);
 
+    // Disk usage
+    components::render_disk_usage_stats(f, areas[5], data, theme);
+
     // Temperature history chart
     let chart_config = chart::ChartConfig::new("TEMPERATURE HISTORY", 0.0, 100.0, theme.fg)
         .with_bg(theme.bg)
         .with_border_color(theme.border_color);
-    chart::render_chart(f, areas[5], &history.temperature_history, &chart_config);
+    chart::render_chart(f, areas[6], &history.temperature_history, &chart_config);
 }
 
 use ratatui::style::Color;

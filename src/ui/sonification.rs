@@ -205,12 +205,16 @@ mod tests {
                 core_usages: vec![50.0, 60.0, 70.0],
                 average_usage: 60.0,
                 power_metrics: CPUMetrics::default(),
+                usage_meta: MetricMeta::unavailable(),
+                power_meta: MetricMeta::unavailable(),
             },
             gpu_info: GpuInfo::default(),
             ane_info: AneInfo::default(),
             dram_info: DramInfo::default(),
             thunderbolt_info: ThunderboltInfo::default(),
             disk_io_info: DiskIoInfo::default(),
+            disk_usage_info: Vec::new(),
+            directory_usage_info: Vec::new(),
             memory_info: MemoryInfo {
                 total_memory: 16 * 1024 * 1024 * 1024,
                 used_memory: 8 * 1024 * 1024 * 1024,
@@ -239,6 +243,7 @@ mod tests {
             timestamp: Instant::now(),
             terminal_info: TerminalInfo::default(),
             carbon_info: crate::carbon::tracker::CarbonTracker::default(),
+            capabilities: crate::collectors::capabilities::CollectorCapabilities::default(),
         }
     }
 

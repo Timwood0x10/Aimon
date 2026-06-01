@@ -33,6 +33,39 @@ impl PrometheusExporter {
             data.memory_info.total_memory as f64,
         );
 
+        for disk in &data.disk_usage_info {
+            Self::add_gauge_with_labels(
+                &mut lines,
+                "system_disk_usage_percent",
+                "Disk usage percentage by mount point",
+                &[("mount", &disk.mount_point), ("name", &disk.name)],
+                disk.usage_percentage as f64,
+            );
+            Self::add_gauge_with_labels(
+                &mut lines,
+                "system_disk_used_bytes",
+                "Disk used bytes by mount point",
+                &[("mount", &disk.mount_point), ("name", &disk.name)],
+                disk.used_bytes as f64,
+            );
+            Self::add_gauge_with_labels(
+                &mut lines,
+                "system_disk_available_bytes",
+                "Disk available bytes by mount point",
+                &[("mount", &disk.mount_point), ("name", &disk.name)],
+                disk.available_bytes as f64,
+            );
+        }
+        for entry in &data.directory_usage_info {
+            Self::add_gauge_with_labels(
+                &mut lines,
+                "system_directory_usage_bytes",
+                "Bounded directory usage sample bytes",
+                &[("path", &entry.path)],
+                entry.size_bytes as f64,
+            );
+        }
+
         // Battery metrics
         Self::add_gauge(
             &mut lines,

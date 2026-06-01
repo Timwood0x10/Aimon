@@ -1,7 +1,7 @@
 //! Full layout - comprehensive system overview
 //! Shows all major system metrics in a multi-panel view
 
-use crate::carbon::render::{render_carbon_panel, render_efficiency_advisor};
+use crate::carbon::render::render_efficiency_advisor;
 use crate::config::Config;
 use crate::history::HistoryData;
 use crate::types::SystemData;
@@ -57,14 +57,14 @@ pub fn draw(
     // Right side: CPU cores bar chart
     components::render_cpu_cores_bar_chart(f, mid[1], data, theme);
 
-    // Bottom section: Processes, Network, Thermal, Disk I/O, ANE
+    // Bottom section: Processes, Network, Thermal, Disk I/O, Storage
     let bottom = layout::create_bottom_stats_layout(main[3]);
 
     components::render_process_list(f, bottom[0], data, config, theme);
     components::render_network_stats(f, bottom[1], data, history, theme);
     components::render_thermal_stats(f, bottom[2], data, theme);
     components::render_disk_io_stats(f, bottom[3], data, theme);
-    render_carbon_panel(f, bottom[4], &data.carbon_info, theme);
+    components::render_disk_usage_stats(f, bottom[4], data, theme);
 
     // Status bar
     let uptime_str = format_uptime(data.system_health.uptime_seconds);

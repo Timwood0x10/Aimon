@@ -1,9 +1,12 @@
 //! Collectors module for system data
 //! Contains specialized collectors for different system metrics
 
+pub mod backends;
+pub mod capabilities;
 pub mod cpu;
+pub mod directory_usage;
 pub mod disk_io;
-pub mod dram;
+pub mod disk_usage;
 pub mod gpu;
 pub mod health;
 pub mod memory;
@@ -17,23 +20,39 @@ pub mod thunderbolt;
 
 use crate::battery_collector::FastBatteryCollector;
 use crate::carbon::tracker::CarbonTracker;
+use crate::collectors::backends::powermetrics::PowermetricsSampler;
+#[cfg(target_os = "macos")]
+use crate::collectors::backends::IoReportSampler;
+#[cfg(target_os = "macos")]
+use crate::collectors::backends::MachCpuSampler;
+use crate::collectors::capabilities::CollectorCapabilities;
+#[cfg(target_os = "macos")]
+use crate::collectors::cpu::get_fallback_cpu_metrics;
+use crate::config::FanControlConfig;
 use crate::types::*;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use sysinfo::{Components, CpuRefreshKind, Networks, ProcessRefreshKind, System};
+use tokio::sync::RwLock;
 
 /// Main data collector that coordinates all sub-collectors
 pub struct DataCollector {
     system: System,
     networks: Networks,
     components: Components,
-    last_powermetrics: Option<Instant>,
-    cached_cpu_metrics: Option<CPUMetrics>,
-    cached_powermetrics_output: Option<String>,
-    powermetrics_cache_duration: Duration,
+    powermetrics_sampler: PowermetricsSampler,
     battery_collector: FastBatteryCollector,
     cached_system_info: Option<SystemInfo>,
     carbon_tracker: CarbonTracker,
     last_carbon_sample: Option<Instant>,
+    pub capabilities: CollectorCapabilities,
+    fan_control: FanControlConfig,
+    directory_usage_cache: Arc<RwLock<Vec<DirectoryUsageInfo>>>,
+    directory_usage_started: bool,
+    #[cfg(target_os = "macos")]
+    mach_sampler: MachCpuSampler,
+    #[cfg(target_os = "macos")]
+    ioreport_sampler: Option<IoReportSampler>,
 }
 
 impl Default for DataCollector {
@@ -48,14 +67,19 @@ impl DataCollector {
             system: System::new_all(),
             networks: Networks::new_with_refreshed_list(),
             components: Components::new_with_refreshed_list(),
-            last_powermetrics: None,
-            cached_cpu_metrics: None,
-            cached_powermetrics_output: None,
-            powermetrics_cache_duration: Duration::from_secs(2),
+            powermetrics_sampler: PowermetricsSampler::new(Duration::from_secs(2)),
             battery_collector: FastBatteryCollector::new(),
             cached_system_info: None,
             carbon_tracker: CarbonTracker::new(),
             last_carbon_sample: None,
+            capabilities: CollectorCapabilities::detect(),
+            fan_control: FanControlConfig::default(),
+            directory_usage_cache: Arc::new(RwLock::new(Vec::new())),
+            directory_usage_started: false,
+            #[cfg(target_os = "macos")]
+            mach_sampler: MachCpuSampler::new(),
+            #[cfg(target_os = "macos")]
+            ioreport_sampler: IoReportSampler::new().ok(),
         }
     }
 
@@ -65,15 +89,41 @@ impl DataCollector {
             system: System::new(),
             networks: Networks::new(),
             components: Components::new(),
-            last_powermetrics: None,
-            cached_cpu_metrics: None,
-            cached_powermetrics_output: None,
-            powermetrics_cache_duration: Duration::from_secs(1),
+            powermetrics_sampler: PowermetricsSampler::new(Duration::from_secs(1)),
             battery_collector: FastBatteryCollector::new(),
             cached_system_info: None,
             carbon_tracker: CarbonTracker::new(),
             last_carbon_sample: None,
+            capabilities: CollectorCapabilities::detect(),
+            fan_control: FanControlConfig::default(),
+            directory_usage_cache: Arc::new(RwLock::new(Vec::new())),
+            directory_usage_started: false,
+            #[cfg(target_os = "macos")]
+            mach_sampler: MachCpuSampler::new(),
+            #[cfg(target_os = "macos")]
+            ioreport_sampler: IoReportSampler::new().ok(),
         }
+    }
+
+    pub fn with_fan_control(mut self, fan_control: FanControlConfig) -> Self {
+        self.fan_control = fan_control;
+        self.capabilities.smc_write_available = self.fan_control.enabled
+            && self.fan_control.runtime_allowed
+            && self.capabilities.smc_read_available;
+        self
+    }
+
+    fn start_directory_usage_once(&mut self) {
+        if self.directory_usage_started {
+            return;
+        }
+        self.directory_usage_started = true;
+        let cache = Arc::clone(&self.directory_usage_cache);
+        tokio::spawn(async move {
+            let entries = directory_usage::collect_directory_usage_once().await;
+            let mut cache = cache.write().await;
+            *cache = entries;
+        });
     }
 
     /// Collect all system data
@@ -81,6 +131,7 @@ impl DataCollector {
     /// CPU usage is instant (sysinfo), powermetrics uses cache for speed.
     pub async fn collect_all_data(&mut self) -> Result<SystemData, Box<dyn std::error::Error>> {
         self.refresh_realtime_data();
+        self.start_directory_usage_once();
 
         // ── Sync collectors (fast, no I/O, run instantly) ──────────────
         let system_info = self.collect_system_info();
@@ -102,19 +153,22 @@ impl DataCollector {
             mut gpu_info,
             thunderbolt_info,
             disk_io_info,
+            disk_usage_info,
             thermal_info,
             performance_metrics,
             system_health,
         ) = tokio::join!(
-            gpu::collect_gpu_info_from_powermetrics(self.cached_powermetrics_output.as_deref()),
+            gpu::collect_gpu_info_from_powermetrics(self.powermetrics_sampler.get_cached_output()),
             thunderbolt::collect_thunderbolt_info(),
             disk_io::collect_disk_io_info(),
+            async { disk_usage::collect_disk_usage_info() },
             self.collect_thermal_info(),
             self.collect_performance_metrics(&cpu_info, total_power),
             self.collect_system_health(),
         );
 
         gpu::complete_static_gpu_info(&mut gpu_info).await;
+        let directory_usage_info = self.directory_usage_cache.read().await.clone();
 
         // battery (separate borrow)
         let battery_info = self.battery_collector.get_battery_info().await;
@@ -129,6 +183,8 @@ impl DataCollector {
             dram_info,
             thunderbolt_info,
             disk_io_info,
+            disk_usage_info,
+            directory_usage_info,
             memory_info,
             network_info,
             temperature_info,
@@ -139,6 +195,7 @@ impl DataCollector {
             system_health,
             terminal_info,
             carbon_info,
+            capabilities: self.capabilities.clone(),
             timestamp: Instant::now(),
         })
     }
@@ -233,25 +290,94 @@ impl DataCollector {
         }
     }
 
-    /// Collect DRAM info from CPU power metrics
+    /// Collect DRAM info from cached powermetrics output
     fn collect_dram_info(&self, cpu_info: &CpuInfo) -> DramInfo {
+        // Try to extract DRAM info from cached powermetrics output
+        let raw_dram_w = self
+            .powermetrics_sampler
+            .get_cached_output()
+            .and_then(backends::powermetrics::extract_dram_power);
+        let power_w = raw_dram_w.unwrap_or(cpu_info.power_metrics.dram_w);
         DramInfo {
             read_bytes_per_sec: 0.0,
             write_bytes_per_sec: 0.0,
             total_bytes_per_sec: 0.0,
-            power_w: cpu_info.power_metrics.dram_w,
+            power_w,
+            meta: if raw_dram_w.is_some() {
+                MetricMeta::measured(MetricSource::Powermetrics)
+            } else {
+                MetricMeta::estimated(
+                    MetricSource::Estimate,
+                    "no DRAM line in powermetrics, using derived value",
+                )
+            },
         }
     }
 
+    /// Try Mach CPU sampling first (native, no subprocess), fall back to sysinfo.
     async fn collect_cpu_info(&mut self) -> Result<CpuInfo, Box<dyn std::error::Error>> {
-        cpu::collect_cpu_info(
-            &self.system,
-            &mut self.last_powermetrics,
-            &mut self.cached_cpu_metrics,
-            &mut self.cached_powermetrics_output,
-            self.powermetrics_cache_duration,
-        )
-        .await
+        #[cfg(target_os = "macos")]
+        if let Some(cpu_usages) = self.try_mach_cpu() {
+            let average_usage = if !cpu_usages.is_empty() {
+                cpu_usages.iter().sum::<f32>() / cpu_usages.len() as f32
+            } else {
+                0.0
+            };
+            // Prefer IOReport for power data (no sudo, native counters),
+            // fall back to powermetrics if IOReport isn't ready yet.
+            let (power_metrics, power_meta) = if let Some(Some(ioreport_sample)) =
+                self.ioreport_sampler.as_mut().map(|s| s.sample_power())
+            {
+                let m = CPUMetrics {
+                    cpu_w: ioreport_sample.cpu_w,
+                    gpu_w: ioreport_sample.gpu_w,
+                    ane_w: ioreport_sample.ane_w,
+                    dram_w: ioreport_sample.dram_w,
+                    package_w: ioreport_sample.package_w,
+                    ..Default::default()
+                };
+                let meta = if ioreport_sample.package_w > 0.0 {
+                    MetricMeta::measured(MetricSource::IoReport)
+                } else {
+                    MetricMeta::estimated(MetricSource::Estimate, "IOReport returned zero")
+                };
+                (m, meta)
+            } else {
+                match self.powermetrics_sampler.sample().await {
+                    Ok(m) => {
+                        let meta = if m.package_w > 0.0 || m.cpu_w > 0.0 {
+                            MetricMeta::measured(MetricSource::Powermetrics)
+                        } else {
+                            MetricMeta::estimated(
+                                MetricSource::Estimate,
+                                "powermetrics unavailable",
+                            )
+                        };
+                        (m, meta)
+                    }
+                    Err(e) => {
+                        log::warn!("Powermetrics failed: {}", e);
+                        (
+                            get_fallback_cpu_metrics(&self.system),
+                            MetricMeta::estimated(
+                                MetricSource::Estimate,
+                                "IOReport+Powermetrics both unavailable",
+                            ),
+                        )
+                    }
+                }
+            };
+            return Ok(CpuInfo {
+                core_usages: cpu_usages,
+                average_usage,
+                power_metrics,
+                usage_meta: MetricMeta::measured(MetricSource::Mach),
+                power_meta,
+            });
+        }
+
+        // Fallback to sysinfo
+        cpu::collect_cpu_info(&self.system, &mut self.powermetrics_sampler).await
     }
 
     fn collect_memory_info(&self) -> MemoryInfo {
@@ -271,7 +397,7 @@ impl DataCollector {
     }
 
     async fn collect_thermal_info(&self) -> ThermalInfo {
-        thermal::collect_thermal_info().await
+        thermal::collect_thermal_info(&self.fan_control).await
     }
 
     async fn collect_performance_metrics(
@@ -284,6 +410,17 @@ impl DataCollector {
 
     async fn collect_system_health(&self) -> SystemHealthInfo {
         health::collect_system_health().await
+    }
+    #[cfg(target_os = "macos")]
+    fn try_mach_cpu(&mut self) -> Option<Vec<f32>> {
+        self.mach_sampler.sample_usage().ok()
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+impl DataCollector {
+    fn try_mach_cpu(&mut self) -> Option<Vec<f32>> {
+        None
     }
 }
 

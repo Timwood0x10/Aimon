@@ -49,6 +49,22 @@ pub fn format_compact_json(data: &SystemData) -> String {
             "pressure": data.thermal_info.thermal_pressure,
             "throttling": data.thermal_info.thermal_throttling,
         },
+        "disk_usage": data.disk_usage_info.iter().map(|disk| serde_json::json!({
+            "mount_point": disk.mount_point,
+            "name": disk.name,
+            "file_system": disk.file_system,
+            "total_bytes": disk.total_bytes,
+            "used_bytes": disk.used_bytes,
+            "available_bytes": disk.available_bytes,
+            "usage_percent": disk.usage_percentage,
+        })).collect::<Vec<_>>(),
+        "directory_usage": data.directory_usage_info.iter().map(|entry| serde_json::json!({
+            "path": entry.path,
+            "size_bytes": entry.size_bytes,
+            "file_count": entry.file_count,
+            "directory_count": entry.directory_count,
+            "partial": entry.is_partial,
+        })).collect::<Vec<_>>(),
         "uptime_seconds": data.system_health.uptime_seconds,
     });
     serde_json::to_string_pretty(&compact).unwrap_or_else(|_| "{}".to_string())
@@ -130,6 +146,7 @@ pub fn format_prometheus(data: &SystemData) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::collectors::capabilities::CollectorCapabilities;
     use crate::types::*;
     use std::time::Instant;
 
@@ -162,12 +179,16 @@ mod tests {
                     dram_w: 0.3,
                     package_w: 2.1,
                 },
+                usage_meta: MetricMeta::measured(MetricSource::Sysinfo),
+                power_meta: MetricMeta::measured(MetricSource::Powermetrics),
             },
             gpu_info: GpuInfo::default(),
             ane_info: AneInfo::default(),
             dram_info: DramInfo::default(),
             thunderbolt_info: ThunderboltInfo::default(),
             disk_io_info: DiskIoInfo::default(),
+            disk_usage_info: Vec::new(),
+            directory_usage_info: Vec::new(),
             memory_info: MemoryInfo {
                 total_memory: 16_000_000_000,
                 used_memory: 8_000_000_000,
@@ -210,6 +231,9 @@ mod tests {
                 thermal_throttling: false,
                 heat_dissipation_rate: 5.0,
                 thermal_pressure: 10,
+                state_meta: MetricMeta::measured(MetricSource::Sysctl),
+                fan_meta: MetricMeta::measured(MetricSource::Powermetrics),
+                fan_control_status: "Disabled".to_string(),
             },
             performance_metrics: PerformanceMetrics::default(),
             system_health: SystemHealthInfo {
@@ -223,6 +247,7 @@ mod tests {
             timestamp: Instant::now(),
             terminal_info: TerminalInfo::default(),
             carbon_info: crate::carbon::tracker::CarbonTracker::default(),
+            capabilities: CollectorCapabilities::default(),
         }
     }
 

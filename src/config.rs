@@ -30,6 +30,38 @@ fn default_language() -> String {
     "en".to_string()
 }
 
+/// Fan control configuration (behind `fan-control` feature gate)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanControlConfig {
+    /// Enable fan control in config. Runtime code must also receive explicit
+    /// operator consent before any write-capable backend can use this value.
+    pub enabled: bool,
+    /// Runtime-only consent from `--allow-fan-control`.
+    #[serde(default, skip_serializing)]
+    pub runtime_allowed: bool,
+    /// Minimum safe RPM floor (validated against SMC fan min)
+    pub safe_min_rpm: u32,
+    /// Maximum safe RPM ceiling (validated against SMC fan max)
+    pub safe_max_rpm: u32,
+    /// Optional target RPM. When absent, write support is available but idle.
+    pub target_rpm: Option<u32>,
+    /// Restore automatic fan control on exit
+    pub restore_on_exit: bool,
+}
+
+impl Default for FanControlConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            runtime_allowed: false,
+            safe_min_rpm: 1000,
+            safe_max_rpm: 6000,
+            target_rpm: None,
+            restore_on_exit: true,
+        }
+    }
+}
+
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -45,6 +77,8 @@ pub struct Config {
     pub process_sort_by: ProcessSortBy,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default)]
+    pub fan_control: FanControlConfig,
 }
 
 /// Alert threshold configuration
@@ -104,6 +138,7 @@ impl Default for Config {
             },
             process_sort_by: ProcessSortBy::default(),
             language: default_language(),
+            fan_control: FanControlConfig::default(),
         }
     }
 }
@@ -139,6 +174,16 @@ impl Config {
         }
         if let Some(theme_name) = theme {
             self.display.theme = theme_name.to_string();
+        }
+    }
+
+    /// Merge fan-control specific CLI flags
+    pub fn merge_fan_control(&mut self, allow_fan_control: bool) {
+        if allow_fan_control {
+            self.fan_control.runtime_allowed = true;
+            log::warn!(
+                "Fan-control runtime consent received via --allow-fan-control; write support remains feature-gated and disabled unless config also enables it"
+            );
         }
     }
 
@@ -179,6 +224,18 @@ impl Config {
 
         if self.language != "en" && self.language != "zh" {
             return Err("language must be 'en' or 'zh'".to_string());
+        }
+
+        if self.fan_control.safe_min_rpm >= self.fan_control.safe_max_rpm {
+            return Err("fan_control.safe_min_rpm must be less than safe_max_rpm".to_string());
+        }
+
+        if let Some(target_rpm) = self.fan_control.target_rpm {
+            if target_rpm < self.fan_control.safe_min_rpm
+                || target_rpm > self.fan_control.safe_max_rpm
+            {
+                return Err("fan_control.target_rpm must be inside the safe RPM range".to_string());
+            }
         }
 
         Ok(())
@@ -519,5 +576,135 @@ mod tests {
             deserialized.process_scroll_offset
         );
         assert_eq!(settings.party_mode, deserialized.party_mode);
+    }
+
+    // ── FanControlConfig tests ────────────────────────────────────────
+
+    #[test]
+    fn test_fan_control_default_values() {
+        let fc = FanControlConfig::default();
+        assert!(!fc.enabled, "fan control should be disabled by default");
+        assert!(
+            !fc.runtime_allowed,
+            "runtime fan-control consent should be false by default"
+        );
+        assert_eq!(fc.safe_min_rpm, 1000);
+        assert_eq!(fc.safe_max_rpm, 6000);
+        assert!(fc.restore_on_exit);
+    }
+
+    #[test]
+    fn test_fan_control_validation_passes() {
+        let mut config = create_valid_config();
+        config.fan_control.safe_min_rpm = 1000;
+        config.fan_control.safe_max_rpm = 6000;
+        assert!(
+            config.validate().is_ok(),
+            "valid fan_control ranges should pass"
+        );
+    }
+
+    #[test]
+    fn test_fan_control_min_equals_max_is_invalid() {
+        let mut config = create_valid_config();
+        config.fan_control.safe_min_rpm = 3000;
+        config.fan_control.safe_max_rpm = 3000;
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.contains("safe_min_rpm must be less than safe_max_rpm"),
+            "got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_fan_control_min_greater_than_max_is_invalid() {
+        let mut config = create_valid_config();
+        config.fan_control.safe_min_rpm = 5000;
+        config.fan_control.safe_max_rpm = 2000;
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.contains("safe_min_rpm must be less than safe_max_rpm"),
+            "got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_merge_fan_control_records_runtime_consent_when_true() {
+        let mut config = create_valid_config();
+        assert!(!config.fan_control.enabled);
+        assert!(!config.fan_control.runtime_allowed);
+        config.merge_fan_control(true);
+        assert!(
+            !config.fan_control.enabled,
+            "CLI consent alone must not enable write-capable fan control"
+        );
+        assert!(
+            config.fan_control.runtime_allowed,
+            "CLI consent should be recorded separately from config enablement"
+        );
+    }
+
+    #[test]
+    fn test_merge_fan_control_noop_when_false() {
+        let mut config = create_valid_config();
+        config.fan_control.enabled = false;
+        config.merge_fan_control(false);
+        assert!(!config.fan_control.enabled);
+        assert!(!config.fan_control.runtime_allowed);
+    }
+
+    #[test]
+    fn test_fan_control_serialization_roundtrip() {
+        let mut config = create_valid_config();
+        config.fan_control.enabled = true;
+        config.fan_control.safe_min_rpm = 1500;
+        config.fan_control.safe_max_rpm = 5500;
+        config.fan_control.restore_on_exit = false;
+
+        let serialized = toml::to_string(&config).unwrap();
+        let deserialized: Config = toml::from_str(&serialized).unwrap();
+
+        assert!(deserialized.fan_control.enabled);
+        assert!(
+            !deserialized.fan_control.runtime_allowed,
+            "runtime consent must not be persisted to config files"
+        );
+        assert_eq!(deserialized.fan_control.safe_min_rpm, 1500);
+        assert_eq!(deserialized.fan_control.safe_max_rpm, 5500);
+        assert!(!deserialized.fan_control.restore_on_exit);
+    }
+
+    #[test]
+    fn test_fan_control_serde_default_on_missing() {
+        // Config without fan_control section should deserialize with defaults
+        let minimal_toml = r#"
+            refresh_rate = 1
+            minimal_mode = false
+            [thresholds]
+            cpu_warning = 75.0
+            cpu_critical = 90.0
+            memory_warning = 75
+            memory_critical = 90
+            temperature_warning = 70.0
+            temperature_critical = 85.0
+            [display]
+            show_temperatures = true
+            show_network = true
+            show_processes = true
+            show_history = true
+            history_size = 60
+            theme = "mactop_green"
+            [notifications]
+            enabled = true
+            cooldown_seconds = 30
+        "#;
+        let config: Config = toml::from_str(minimal_toml).unwrap();
+        assert!(!config.fan_control.enabled);
+        assert!(!config.fan_control.runtime_allowed);
+        assert_eq!(config.fan_control.safe_min_rpm, 1000);
+        assert_eq!(config.fan_control.safe_max_rpm, 6000);
+        assert!(config.fan_control.restore_on_exit);
     }
 }

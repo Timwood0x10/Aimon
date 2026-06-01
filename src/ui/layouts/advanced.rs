@@ -1,7 +1,7 @@
 //! Advanced layout - comprehensive view matching mactop's full feature set
 //! Shows CPU+GPU+ANE+Power+Memory+Network+Disk+Temperature+Fan+Process+Thunderbolt
 
-use crate::carbon::render::{render_carbon_panel, render_efficiency_advisor};
+use crate::carbon::render::render_efficiency_advisor;
 use crate::config::Config;
 use crate::history::HistoryData;
 use crate::types::SystemData;
@@ -96,7 +96,7 @@ pub fn draw(
     // Process list
     components::render_process_list(f, row4[0], data, config, theme);
 
-    // Right side: Network + Disk + Thunderbolt + Thermals
+    // Right side: Network + Disk + Storage + Thermals
     let right = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -109,7 +109,7 @@ pub fn draw(
 
     components::render_network_stats(f, right[0], data, history, theme);
     components::render_disk_io_stats(f, right[1], data, theme);
-    render_carbon_panel(f, right[2], &data.carbon_info, theme);
+    components::render_disk_usage_stats(f, right[2], data, theme);
     components::render_detailed_temperatures(f, right[3], data, theme);
 
     // Status bar

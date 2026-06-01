@@ -102,6 +102,7 @@ cargo run -- --stream prometheus
 | `7` | Network layout |
 | `8` | System health layout |
 | `9` | Thermal layout |
+| `d` | Storage layout |
 | `h` / `←` | Previous layout |
 | `l` / `→` / `Tab` | Next layout |
 | `j` / `↓` | Scroll down |
@@ -128,6 +129,28 @@ cargo run -- --stream prometheus
 - **Efficiency advisor**: highlights high idle power and shows recent anomaly samples.
 - **Session report**: runtime, total Wh, CO₂ estimate, average/peak power, anomaly count, and top estimated energy offender.
 - **Battery runtime estimate**: when discharging, estimates remaining runtime from recent power draw.
+- **Storage view**: mounted-volume bars, filesystem/removable labels, disk I/O, capacity trends, and a one-shot top-directory scan. If `dust` is installed it is used first; otherwise Aimon falls back to a bounded built-in scanner.
+
+## Data Sources
+
+Aimon uses a layered collector stack. Stable public tools remain the fallback path, while native macOS backends are treated as experimental until they are validated across more Apple Silicon machines:
+
+- `sysinfo`: CPU usage, processes, memory, network interfaces, system metadata, and component temperatures where exposed.
+- `powermetrics`: CPU/GPU/ANE/package power and CPU residency/frequency parsing; full data usually requires `sudo`.
+- Mach `host_processor_info`: native per-core CPU usage on macOS when available.
+- IOReport: experimental no-sudo CPU/GPU/ANE/DRAM power sampling when matching channels are available.
+- Apple SMC: experimental temperature/fan enumeration; SMCWrite fan mode and target RPM are gated behind the `fan-control` Cargo feature, config enablement, and `--allow-fan-control`.
+- IOKit IORegistry: experimental Apple GPU core count, max frequency, and frequency-table lookup when the platform exposes those properties.
+- NSProcessInfo.thermalState: native thermal-state lookup through Foundation on macOS.
+- `sysctl`: thermal pressure and model/CPU metadata used by fallback detection.
+- `system_profiler`, `ioreg`, and `pmset`: GPU model details and battery/charger/capacity information.
+- `iostat`: disk I/O sampling.
+- `sysinfo::Disks`: mounted-volume disk capacity and usage percentages.
+- Optional `dust`: one-shot top-directory size scan for the Storage view. If unavailable or timed out, Aimon uses its bounded built-in scanner.
+
+IOHIDEventSystemClient temperature fallback is experimental. Fan writes are disabled in default builds; enabling them requires compiling with `--features fan-control`, setting `fan_control.enabled = true`, and passing `--allow-fan-control` at runtime.
+
+For the concrete collector-by-collector implementation plan, see `docs/data-collection-roadmap.md`.
 
 ## Headless Output
 

@@ -247,12 +247,16 @@ mod tests {
                 core_usages: vec![],
                 average_usage: 0.0,
                 power_metrics: CPUMetrics::default(),
+                usage_meta: MetricMeta::unavailable(),
+                power_meta: MetricMeta::unavailable(),
             },
             gpu_info: GpuInfo::default(),
             ane_info: AneInfo::default(),
             dram_info: DramInfo::default(),
             thunderbolt_info: ThunderboltInfo::default(),
             disk_io_info: DiskIoInfo::default(),
+            disk_usage_info: Vec::new(),
+            directory_usage_info: Vec::new(),
             memory_info: MemoryInfo {
                 total_memory: 0,
                 used_memory: 0,
@@ -271,6 +275,7 @@ mod tests {
             timestamp: Instant::now(),
             terminal_info: TerminalInfo::default(),
             carbon_info: crate::carbon::tracker::CarbonTracker::default(),
+            capabilities: crate::collectors::capabilities::CollectorCapabilities::default(),
         };
 
         // With no temperature data, average should be None

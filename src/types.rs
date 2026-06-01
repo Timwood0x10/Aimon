@@ -1,7 +1,113 @@
 use crate::carbon::tracker::CarbonTracker;
+use crate::collectors::capabilities::CollectorCapabilities;
 use serde::Serialize;
+use std::fmt;
 use std::time::Instant;
 use sysinfo::Pid;
+
+// ── Metric Source Metadata ──────────────────────────────────────────
+
+/// Origin of a metric value
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub enum MetricSource {
+    Sysinfo,
+    Powermetrics,
+    Sysctl,
+    SystemProfiler,
+    Ioreg,
+    Iostat,
+    Mach,
+    Foundation,
+    Smc,
+    Iokit,
+    IoReport,
+    IoHid,
+    Estimate,
+    Unavailable,
+}
+
+/// Confidence level of a metric
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub enum MetricConfidence {
+    Measured,
+    Derived,
+    Estimated,
+    Unavailable,
+}
+
+/// Metadata attached to a metric or metric group
+#[derive(Debug, Clone, Serialize)]
+pub struct MetricMeta {
+    pub source: MetricSource,
+    pub confidence: MetricConfidence,
+    pub detail: Option<String>,
+}
+
+impl MetricMeta {
+    pub fn measured(source: MetricSource) -> Self {
+        Self {
+            source,
+            confidence: MetricConfidence::Measured,
+            detail: None,
+        }
+    }
+
+    pub fn estimated(source: MetricSource, detail: impl Into<String>) -> Self {
+        Self {
+            source,
+            confidence: MetricConfidence::Estimated,
+            detail: Some(detail.into()),
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self {
+            source: MetricSource::Unavailable,
+            confidence: MetricConfidence::Unavailable,
+            detail: None,
+        }
+    }
+}
+
+impl Default for MetricMeta {
+    fn default() -> Self {
+        Self::unavailable()
+    }
+}
+
+impl fmt::Display for MetricSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MetricSource::Sysinfo => write!(f, "SysInfo"),
+            MetricSource::Powermetrics => write!(f, "Powermetrics"),
+            MetricSource::Sysctl => write!(f, "SysCtl"),
+            MetricSource::SystemProfiler => write!(f, "SysProfiler"),
+            MetricSource::Ioreg => write!(f, "IOReg"),
+            MetricSource::Iostat => write!(f, "IOStat"),
+            MetricSource::Mach => write!(f, "Mach"),
+            MetricSource::Foundation => write!(f, "Foundation"),
+            MetricSource::Smc => write!(f, "SMC"),
+            MetricSource::Iokit => write!(f, "IOKit"),
+            MetricSource::IoReport => write!(f, "IOReport"),
+            MetricSource::IoHid => write!(f, "IOHID"),
+            MetricSource::Estimate => write!(f, "Estimate"),
+            MetricSource::Unavailable => write!(f, "N/A"),
+        }
+    }
+}
+
+impl fmt::Display for MetricConfidence {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MetricConfidence::Measured => write!(f, "Measured"),
+            MetricConfidence::Derived => write!(f, "Derived"),
+            MetricConfidence::Estimated => write!(f, "Estimated"),
+            MetricConfidence::Unavailable => write!(f, "Unavailable"),
+        }
+    }
+}
+
+// ── Core Types ───────────────────────────────────────────────────────
 
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct CPUMetrics {
@@ -22,9 +128,11 @@ pub struct GpuInfo {
     pub usage_percentage: f32,
     pub freq_mhz: i32,
     pub max_freq_mhz: i32,
+    pub frequency_table_mhz: Vec<i32>,
     pub core_count: usize,
     pub sram_power_w: f64,
     pub tflops: f64,
+    pub meta: MetricMeta,
 }
 
 impl Default for GpuInfo {
@@ -33,9 +141,11 @@ impl Default for GpuInfo {
             usage_percentage: 0.0,
             freq_mhz: 0,
             max_freq_mhz: 0,
+            frequency_table_mhz: Vec::new(),
             core_count: 0,
             sram_power_w: 0.0,
             tflops: 0.0,
+            meta: MetricMeta::unavailable(),
         }
     }
 }
@@ -63,6 +173,7 @@ pub struct DramInfo {
     pub write_bytes_per_sec: f64,
     pub total_bytes_per_sec: f64,
     pub power_w: f64,
+    pub meta: MetricMeta,
 }
 
 impl Default for DramInfo {
@@ -72,6 +183,7 @@ impl Default for DramInfo {
             write_bytes_per_sec: 0.0,
             total_bytes_per_sec: 0.0,
             power_w: 0.0,
+            meta: MetricMeta::unavailable(),
         }
     }
 }
@@ -122,6 +234,29 @@ impl Default for DiskIoInfo {
     }
 }
 
+/// Disk capacity and filesystem usage for one mounted volume.
+#[derive(Debug, Clone, Serialize)]
+pub struct DiskUsageInfo {
+    pub name: String,
+    pub mount_point: String,
+    pub file_system: String,
+    pub total_bytes: u64,
+    pub available_bytes: u64,
+    pub used_bytes: u64,
+    pub usage_percentage: f32,
+    pub is_removable: bool,
+}
+
+/// Bounded directory-size sample for Storage view top consumers.
+#[derive(Debug, Clone, Serialize)]
+pub struct DirectoryUsageInfo {
+    pub path: String,
+    pub size_bytes: u64,
+    pub file_count: u64,
+    pub directory_count: u64,
+    pub is_partial: bool,
+}
+
 /// Fan information with detailed stats
 #[derive(Debug, Clone, Serialize)]
 pub struct FanInfo {
@@ -134,7 +269,7 @@ pub struct FanInfo {
 }
 
 /// Thermal state as reported by macOS
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ThermalState {
     Nominal,
     Fair,
@@ -145,6 +280,17 @@ pub enum ThermalState {
 impl Default for ThermalState {
     fn default() -> Self {
         Self::Nominal
+    }
+}
+
+impl std::fmt::Display for ThermalState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ThermalState::Nominal => write!(f, "Nominal"),
+            ThermalState::Fair => write!(f, "Fair"),
+            ThermalState::Serious => write!(f, "Serious"),
+            ThermalState::Critical => write!(f, "Critical"),
+        }
     }
 }
 
@@ -189,6 +335,8 @@ pub struct CpuInfo {
     pub core_usages: Vec<f32>,
     pub average_usage: f32,
     pub power_metrics: CPUMetrics,
+    pub usage_meta: MetricMeta,
+    pub power_meta: MetricMeta,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -215,6 +363,16 @@ pub struct TemperatureInfo {
     pub label: String,
     pub temperature: f32,
     pub critical_temperature: f32,
+}
+
+impl Default for TemperatureInfo {
+    fn default() -> Self {
+        Self {
+            label: String::new(),
+            temperature: 0.0,
+            critical_temperature: 0.0,
+        }
+    }
 }
 
 fn serialize_pid<S: serde::Serializer>(pid: &Pid, serializer: S) -> Result<S::Ok, S::Error> {
@@ -276,6 +434,9 @@ pub struct ThermalInfo {
     pub thermal_pressure: u8,       // 0-100
     /// Legacy fan_speeds for backward compatibility
     pub fan_speeds: Vec<u32>, // RPM
+    pub state_meta: MetricMeta,
+    pub fan_meta: MetricMeta,
+    pub fan_control_status: String,
 }
 
 impl Default for ThermalInfo {
@@ -287,6 +448,9 @@ impl Default for ThermalInfo {
             heat_dissipation_rate: 0.0,
             thermal_pressure: 0,
             fan_speeds: Vec::new(),
+            state_meta: MetricMeta::unavailable(),
+            fan_meta: MetricMeta::unavailable(),
+            fan_control_status: "Disabled".to_string(),
         }
     }
 }
@@ -356,6 +520,8 @@ pub struct SystemData {
     pub dram_info: DramInfo,
     pub thunderbolt_info: ThunderboltInfo,
     pub disk_io_info: DiskIoInfo,
+    pub disk_usage_info: Vec<DiskUsageInfo>,
+    pub directory_usage_info: Vec<DirectoryUsageInfo>,
     pub memory_info: MemoryInfo,
     pub network_info: Vec<NetworkInterface>,
     pub temperature_info: Vec<TemperatureInfo>,
@@ -366,6 +532,7 @@ pub struct SystemData {
     pub system_health: SystemHealthInfo,
     pub terminal_info: TerminalInfo,
     pub carbon_info: CarbonTracker,
+    pub capabilities: CollectorCapabilities,
     #[serde(skip)]
     pub timestamp: Instant,
 }
