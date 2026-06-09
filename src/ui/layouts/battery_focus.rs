@@ -36,7 +36,7 @@ fn create_battery_focus_layout(area: Rect) -> Vec<Rect> {
 
 /// Draw the battery focus layout
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = create_battery_focus_layout(f.size());
+    let areas = create_battery_focus_layout(f.area());
 
     // Header
     components::render_header(f, areas[0], data, theme);
@@ -168,9 +168,12 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         );
     f.render_widget(power_block, areas[3]);
 
-    // CPU history as proxy for power trend
+    // CPU history as proxy for power trend (ratatui v0.30.1: area fill + shadow)
     let chart_config = chart::ChartConfig::new("CPU POWER TREND", 0.0, 100.0, theme.fg)
         .with_bg(theme.bg)
-        .with_border_color(theme.border_color);
+        .with_border_color(theme.border_color)
+        .with_marker(chart::ChartMarker::Braille)
+        .with_shadow(chart::ChartShadow::MediumShade)
+        .as_area(0.0);
     chart::render_chart(f, areas[4], &history.cpu_history, &chart_config);
 }

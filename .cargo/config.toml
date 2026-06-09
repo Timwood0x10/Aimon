@@ -16,3 +16,8 @@ codegen-units = 1
 
 [build]
 rustflags = ["-C", "embed-bitcode=no"]
+rustc-wrapper = "sccache"
+
+# Parallel compilation
+[env]
+CARGO_BUILD_JOBS = "8"

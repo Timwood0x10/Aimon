@@ -19,7 +19,7 @@ pub fn draw(
     _config: &Config,
     theme: &Theme,
 ) {
-    let size = f.size();
+    let size = f.area();
 
     let main = Layout::default()
         .direction(Direction::Vertical)

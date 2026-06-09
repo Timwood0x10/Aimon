@@ -61,7 +61,7 @@ fn parse_lsof_output(output: &str) -> TerminalInfo {
         })
         .collect();
 
-    processes.sort_by(|a, b| b.pty_count.cmp(&a.pty_count));
+    processes.sort_by_key(|p| std::cmp::Reverse(p.pty_count));
     processes.truncate(10); // Keep top 10
 
     // Count local terminals (common terminal emulators)

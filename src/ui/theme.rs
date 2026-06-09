@@ -3,6 +3,30 @@
 
 use ratatui::style::Color;
 
+/// Linear interpolate between two RGB colors by factor t (0.0-1.0)
+pub fn lerp_color(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    if let (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) = (a, b) {
+        Color::Rgb(
+            (r1 as f32 + (r2 as f32 - r1 as f32) * t).round() as u8,
+            (g1 as f32 + (g2 as f32 - g1 as f32) * t).round() as u8,
+            (b1 as f32 + (b2 as f32 - b1 as f32) * t).round() as u8,
+        )
+    } else {
+        a
+    }
+}
+
+/// Smooth tri-stage gradient: low→mid (0-50%) then mid→high (50-100%)
+pub fn gradient_3(ratio: f32, low: Color, mid: Color, high: Color) -> Color {
+    let ratio = ratio.clamp(0.0, 1.0);
+    if ratio < 0.5 {
+        lerp_color(low, mid, ratio * 2.0)
+    } else {
+        lerp_color(mid, high, (ratio - 0.5) * 2.0)
+    }
+}
+
 /// Color scheme for the UI
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -266,9 +290,61 @@ impl Theme {
         }
     }
 
+    /// Synthwave - hot pink, cyan, and electric purple on deep indigo
+    pub fn synthwave() -> Self {
+        Self {
+            bg: Color::Rgb(10, 5, 25),
+            fg: Color::Rgb(245, 235, 255),
+            accent: Color::Rgb(255, 50, 150),
+            border_color: Color::Rgb(255, 50, 150),
+            cpu_color: Color::Rgb(0, 235, 255),
+            mem_color: Color::Rgb(255, 70, 170),
+            temp_color: Color::Rgb(255, 210, 50),
+            net_rx_color: Color::Rgb(100, 200, 255),
+            net_tx_color: Color::Rgb(200, 100, 255),
+            battery_color: Color::Rgb(50, 255, 150),
+            warning_color: Color::Rgb(255, 230, 50),
+            critical_color: Color::Rgb(255, 30, 60),
+        }
+    }
+
+    /// Blood Moon - crimson, ember, and gold on near-black
+    pub fn blood_moon() -> Self {
+        Self {
+            bg: Color::Rgb(10, 5, 5),
+            fg: Color::Rgb(255, 220, 210),
+            accent: Color::Rgb(255, 60, 40),
+            border_color: Color::Rgb(200, 40, 30),
+            cpu_color: Color::Rgb(255, 120, 80),
+            mem_color: Color::Rgb(255, 200, 50),
+            temp_color: Color::Rgb(255, 60, 40),
+            net_rx_color: Color::Rgb(255, 150, 100),
+            net_tx_color: Color::Rgb(255, 100, 60),
+            battery_color: Color::Rgb(255, 180, 50),
+            warning_color: Color::Rgb(255, 220, 50),
+            critical_color: Color::Rgb(255, 0, 0),
+        }
+    }
+
     /// Returns a list of all available theme names
     pub fn all_themes() -> Vec<&'static str> {
-        Self::mactop_color_themes()
+        let mut themes = vec![
+            "cyberpunk",
+            "synthwave",
+            "blood_moon",
+            "nord",
+            "dracula",
+            "tokyo_night",
+            "monokai",
+            "solarized_dark",
+            "gruvbox",
+            "catppuccin",
+            "one_dark",
+            "matrix_neon",
+            "gold_pro",
+        ];
+        themes.extend(Self::mactop_color_themes());
+        themes
     }
 
     /// Returns mactop-style foreground color variants for the T key.
@@ -288,6 +364,8 @@ impl Theme {
     pub fn from_name(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "cyberpunk" => Some(Self::cyberpunk()),
+            "synthwave" => Some(Self::synthwave()),
+            "blood_moon" | "bloodmoon" => Some(Self::blood_moon()),
             "nord" => Some(Self::nord()),
             "dracula" => Some(Self::dracula()),
             "tokyo_night" | "tokyonight" => Some(Self::tokyo_night()),
@@ -332,6 +410,10 @@ impl Theme {
     pub fn name(&self) -> &'static str {
         if self.bg == Color::Rgb(5, 5, 16) {
             "cyberpunk"
+        } else if self.bg == Color::Rgb(10, 5, 25) {
+            "synthwave"
+        } else if self.bg == Color::Rgb(10, 5, 5) {
+            "blood_moon"
         } else if self.bg == Color::Rgb(36, 40, 59) {
             "nord"
         } else if self.bg == Color::Rgb(30, 31, 43) {

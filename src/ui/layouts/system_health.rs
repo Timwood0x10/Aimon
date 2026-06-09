@@ -59,7 +59,7 @@ fn format_uptime(seconds: u64) -> String {
 
 /// Draw the system health layout
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = create_system_health_layout(f.size());
+    let areas = create_system_health_layout(f.area());
 
     // Header
     components::render_header(f, areas[0], data, theme);
@@ -250,10 +250,13 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
     // Disk usage
     components::render_disk_usage_stats(f, areas[5], data, theme);
 
-    // Temperature history chart
+    // Temperature history chart (ratatui v0.30.1: area fill + shadow + dot marker)
     let chart_config = chart::ChartConfig::new("TEMPERATURE HISTORY", 0.0, 100.0, theme.fg)
         .with_bg(theme.bg)
-        .with_border_color(theme.border_color);
+        .with_border_color(theme.border_color)
+        .with_marker(chart::ChartMarker::Dot)
+        .with_shadow(chart::ChartShadow::DarkShade)
+        .as_area(0.0);
     chart::render_chart(f, areas[6], &history.temperature_history, &chart_config);
 }
 

@@ -11,7 +11,7 @@ pub fn collect_process_info(system: &System) -> Vec<ProcessInfo> {
         .iter()
         .map(|(pid, process)| ProcessInfo {
             pid: *pid,
-            name: process.name().to_string(),
+            name: process.name().to_string_lossy().to_string(),
             cpu_usage: process.cpu_usage(),
             memory_usage: process.memory(),
             disk_read_bytes: process.disk_usage().read_bytes,

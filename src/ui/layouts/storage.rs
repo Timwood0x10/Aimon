@@ -14,7 +14,7 @@ use ratatui::{
 
 /// Draw the storage focused layout.
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = create_storage_layout(f.size());
+    let areas = create_storage_layout(f.area());
 
     components::render_header(f, areas[0], data, theme);
     render_mounts(f, areas[1], data, theme);
@@ -23,13 +23,18 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
 
     let usage_chart = chart::ChartConfig::new("PRIMARY DISK USAGE %", 0.0, 100.0, theme.mem_color)
         .with_bg(theme.bg)
-        .with_border_color(theme.border_color);
+        .with_border_color(theme.border_color)
+        .with_marker(chart::ChartMarker::HalfBlock)
+        .with_shadow(chart::ChartShadow::MediumShade)
+        .as_area(0.0);
     chart::render_chart(f, areas[4], &history.disk_usage_history, &usage_chart);
 
     let io_max = history.get_disk_io_rate().max(1.0) * 1.25;
     let io_chart = chart::ChartConfig::new("DISK I/O TREND B/S", 0.0, io_max, theme.net_tx_color)
         .with_bg(theme.bg)
-        .with_border_color(theme.border_color);
+        .with_border_color(theme.border_color)
+        .with_marker(chart::ChartMarker::Bar)
+        .with_shadow(chart::ChartShadow::LightShade);
     chart::render_chart(f, areas[5], &history.disk_io_rate_history, &io_chart);
 
     let trend = history

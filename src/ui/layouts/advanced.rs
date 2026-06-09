@@ -20,7 +20,7 @@ pub fn draw(
     config: &Config,
     theme: &Theme,
 ) {
-    let size = f.size();
+    let size = f.area();
 
     // Main vertical layout: header + content + status
     let main = Layout::default()

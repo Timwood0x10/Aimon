@@ -182,13 +182,9 @@ fn guess_gpu_cores_from_brand(brand: &str) -> usize {
         40
     } else if brand_lower.contains("m4 pro") {
         20
-    } else if brand_lower.contains("m4") {
+    } else if brand_lower.contains("m4") || brand_lower.contains("m2") {
         10
-    } else if brand_lower.contains("m2") {
-        10
-    } else if brand_lower.contains("m1") {
-        8
     } else {
-        8 // Default fallback
+        8
     }
 }

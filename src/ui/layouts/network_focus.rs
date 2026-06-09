@@ -58,7 +58,7 @@ fn format_rate(rate: f64) -> String {
 
 /// Draw the network focus layout
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = create_network_focus_layout(f.size());
+    let areas = create_network_focus_layout(f.area());
 
     // Header
     components::render_header(f, areas[0], data, theme);
@@ -163,14 +163,26 @@ pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &The
         );
     f.render_widget(rate_block, areas[4]);
 
-    // RX sparkline (large)
-    let rx_config = chart::SparklineConfig::new("NETWORK RX", theme.fg)
-        .with_bg(theme.bg)
-        .with_border_color(theme.border_color);
+    // RX sparkline (large, ratatui v0.30.1: bar marker + shadow for visual pop)
     let rx_data: std::collections::VecDeque<u64> = history
         .network_rx_rate_history
         .iter()
         .map(|&v| v as u64)
         .collect();
-    chart::render_sparkline(f, areas[5], &rx_data, &rx_config);
+    // Use a styled chart config instead of sparkline for more control
+    let rx_max = history.network_rx_rate_history.iter()
+        .copied()
+        .fold(0.0_f64, f64::max)
+        .max(1.0);
+    let rx_chart_config = chart::ChartConfig::new("NETWORK RX", 0.0, rx_max, theme.net_rx_color)
+        .with_bg(theme.bg)
+        .with_border_color(theme.border_color)
+        .with_marker(chart::ChartMarker::Bar)
+        .with_shadow(chart::ChartShadow::LightShade)
+        .as_area(0.0);
+
+    // Convert to f64 VecDeque for render_chart
+    let rx_converted: std::collections::VecDeque<f64> =
+        rx_data.iter().map(|&v| v as f64).collect();
+    chart::render_chart(f, areas[5], &rx_converted, &rx_chart_config);
 }

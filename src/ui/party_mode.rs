@@ -162,7 +162,7 @@ impl PartyMode {
 
     /// Render firework sparkles on the screen
     fn render_fireworks(&self, f: &mut Frame) {
-        let area = f.size();
+        let area = f.area();
         let positions = self.firework_positions(area.width, area.height);
         let sparkles = ['*', '+', '.', 'o', 'x'];
         let colors = [
@@ -189,7 +189,7 @@ impl PartyMode {
 
     /// Render glitch overlay effect
     fn render_glitch_overlay(&self, f: &mut Frame) {
-        let area = f.size();
+        let area = f.area();
         let glitch_chars = ['!', '#', '%', '&', '?', '>', '<', '~'];
         let frame = self.frame_count;
 
@@ -216,7 +216,7 @@ impl PartyMode {
 
     /// Render matrix rain overlay
     fn render_matrix_overlay(&self, f: &mut Frame) {
-        let area = f.size();
+        let area = f.area();
         // Only render a few falling characters as overlay
         let frame = self.frame_count;
         for col in (0..area.width).step_by(3) {

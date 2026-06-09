@@ -53,7 +53,7 @@ fn create_gpu_focus_layout(area: Rect) -> Vec<Rect> {
 
 /// Draw the GPU focus layout
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = create_gpu_focus_layout(f.size());
+    let areas = create_gpu_focus_layout(f.area());
 
     // Header
     components::render_header(f, areas[0], data, theme);

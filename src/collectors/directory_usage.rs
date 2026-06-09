@@ -71,7 +71,7 @@ fn collect_directory_usage_from_paths(paths: Vec<PathBuf>) -> Vec<DirectoryUsage
         .filter_map(|path| scan_directory_usage(&path, limits).ok())
         .collect::<Vec<_>>();
 
-    entries.sort_by(|left, right| right.size_bytes.cmp(&left.size_bytes));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.size_bytes));
     entries.truncate(MAX_TOP_DIRECTORIES);
     entries
 }
@@ -105,7 +105,7 @@ fn parse_dust_output(output: &str) -> Vec<DirectoryUsageInfo> {
         .lines()
         .filter_map(parse_dust_line)
         .collect::<Vec<_>>();
-    entries.sort_by(|left, right| right.size_bytes.cmp(&left.size_bytes));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.size_bytes));
     entries.truncate(MAX_TOP_DIRECTORIES);
     entries
 }

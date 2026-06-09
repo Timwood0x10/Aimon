@@ -1,9 +1,6 @@
 use clap::{Arg, Command};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use libc::getuid;
-use termion::{
-    event::{Event, Key},
-    input::TermRead,
-};
 use tokio::sync::mpsc as tokio_mpsc;
 
 #[derive(Debug)]
@@ -162,72 +159,83 @@ pub async fn handle_input() -> tokio_mpsc::Receiver<InputEvent> {
     let (tx, rx) = tokio_mpsc::channel(32);
 
     // MUST use std::thread::spawn, NOT tokio::spawn!
-    // stdin.events() is a blocking iterator that would freeze a tokio worker.
+    // event::read() is a blocking call that would freeze a tokio worker.
     // blocking_send() doesn't need async runtime scheduling.
     std::thread::spawn(move || {
-        let stdin = std::io::stdin();
+        loop {
+            match event::read() {
+                Ok(Event::Key(key)) => {
+                    let input_event = match key.code {
+                        // Quit
+                        KeyCode::Char('q') if key.modifiers == KeyModifiers::NONE => {
+                            Some(InputEvent::Quit)
+                        }
+                        KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
+                            Some(InputEvent::Quit)
+                        }
 
-        for event in stdin.events().flatten() {
-            let input_event = match event {
-                // Quit
-                Event::Key(Key::Char('q')) | Event::Key(Key::Ctrl('c')) => Some(InputEvent::Quit),
+                        // Layout navigation (vim h/l and arrow keys)
+                        KeyCode::Char('h') | KeyCode::Left => Some(InputEvent::PreviousLayout),
+                        KeyCode::Char('l') | KeyCode::Right => Some(InputEvent::NextLayout),
 
-                // Layout navigation (vim h/l and arrow keys)
-                Event::Key(Key::Char('h')) | Event::Key(Key::Left) => {
-                    Some(InputEvent::PreviousLayout)
+                        // Scroll navigation (vim j/k and arrow keys)
+                        KeyCode::Char('j') | KeyCode::Down => Some(InputEvent::ScrollDown),
+                        KeyCode::Char('k') | KeyCode::Up => Some(InputEvent::ScrollUp),
+
+                        // Jump to top/bottom (vim g/G)
+                        KeyCode::Char('g') if key.modifiers == KeyModifiers::NONE => {
+                            Some(InputEvent::GoToTop)
+                        }
+                        KeyCode::Char('G') => Some(InputEvent::GoToBottom),
+
+                        // Quick layout jump (0-9)
+                        KeyCode::Char(c) if c.is_ascii_digit() => {
+                            Some(InputEvent::JumpToLayout(c.to_digit(10).unwrap() as u8))
+                        }
+                        KeyCode::Char('d') => Some(InputEvent::JumpToLayout(10)),
+                        KeyCode::Enter | KeyCode::Char(' ') => Some(InputEvent::JumpToLayout(1)),
+
+                        // Sort cycling (vim s/S)
+                        KeyCode::Char('s') if key.modifiers == KeyModifiers::NONE => {
+                            Some(InputEvent::CycleSortForward)
+                        }
+                        KeyCode::Char('S') => Some(InputEvent::CycleSortBackward),
+
+                        // Search and kill
+                        KeyCode::Char('/') => Some(InputEvent::SearchProcess),
+                        KeyCode::F(9) => Some(InputEvent::KillProcess),
+
+                        // Help overlay
+                        KeyCode::Char('?') => Some(InputEvent::ToggleHelp),
+
+                        // Existing bindings
+                        KeyCode::Char('n') if key.modifiers == KeyModifiers::NONE => {
+                            Some(InputEvent::ToggleNotifications)
+                        }
+                        KeyCode::Char('r') if key.modifiers == KeyModifiers::NONE => {
+                            Some(InputEvent::Refresh)
+                        }
+                        KeyCode::Char('R') => Some(InputEvent::ShowSessionReport),
+                        KeyCode::Char('t') if key.modifiers == KeyModifiers::NONE => {
+                            Some(InputEvent::CycleTheme)
+                        }
+                        KeyCode::Tab => Some(InputEvent::NextLayout),
+                        KeyCode::BackTab => Some(InputEvent::PreviousLayout),
+
+                        _ => None,
+                    };
+
+                    if let Some(event) = input_event {
+                        if tx.blocking_send(event).is_err() {
+                            break;
+                        }
+                    }
                 }
-                Event::Key(Key::Char('l')) | Event::Key(Key::Right) => Some(InputEvent::NextLayout),
-
-                // Scroll navigation (vim j/k and arrow keys)
-                Event::Key(Key::Char('j')) | Event::Key(Key::Down) => Some(InputEvent::ScrollDown),
-                Event::Key(Key::Char('k')) | Event::Key(Key::Up) => Some(InputEvent::ScrollUp),
-
-                // Jump to top/bottom (vim g/G)
-                Event::Key(Key::Char('g')) => Some(InputEvent::GoToTop),
-                Event::Key(Key::Char('G')) => Some(InputEvent::GoToBottom),
-
-                // Quick layout jump (0-9)
-                Event::Key(Key::Char('0')) => Some(InputEvent::JumpToLayout(0)),
-                Event::Key(Key::Char('1')) => Some(InputEvent::JumpToLayout(1)),
-                Event::Key(Key::Char('2')) => Some(InputEvent::JumpToLayout(2)),
-                Event::Key(Key::Char('3')) => Some(InputEvent::JumpToLayout(3)),
-                Event::Key(Key::Char('4')) => Some(InputEvent::JumpToLayout(4)),
-                Event::Key(Key::Char('5')) => Some(InputEvent::JumpToLayout(5)),
-                Event::Key(Key::Char('6')) => Some(InputEvent::JumpToLayout(6)),
-                Event::Key(Key::Char('7')) => Some(InputEvent::JumpToLayout(7)),
-                Event::Key(Key::Char('8')) => Some(InputEvent::JumpToLayout(8)),
-                Event::Key(Key::Char('9')) => Some(InputEvent::JumpToLayout(9)),
-                Event::Key(Key::Char('d')) => Some(InputEvent::JumpToLayout(10)),
-                Event::Key(Key::Char('\n')) | Event::Key(Key::Char(' ')) => {
-                    Some(InputEvent::JumpToLayout(1))
-                }
-
-                // Sort cycling (vim s/S)
-                Event::Key(Key::Char('s')) => Some(InputEvent::CycleSortForward),
-                Event::Key(Key::Char('S')) => Some(InputEvent::CycleSortBackward),
-
-                // Search and kill
-                Event::Key(Key::Char('/')) => Some(InputEvent::SearchProcess),
-                Event::Key(Key::F(9)) => Some(InputEvent::KillProcess),
-
-                // Help overlay
-                Event::Key(Key::Char('?')) => Some(InputEvent::ToggleHelp),
-
-                // Existing bindings
-                Event::Key(Key::Char('n')) => Some(InputEvent::ToggleNotifications),
-                Event::Key(Key::Char('r')) => Some(InputEvent::Refresh),
-                Event::Key(Key::Char('R')) => Some(InputEvent::ShowSessionReport),
-                Event::Key(Key::Char('t')) => Some(InputEvent::CycleTheme),
-                Event::Key(Key::Char('\t')) => Some(InputEvent::NextLayout),
-                Event::Key(Key::BackTab) => Some(InputEvent::PreviousLayout),
-
-                _ => None,
-            };
-
-            if let Some(event) = input_event {
-                if tx.blocking_send(event).is_err() {
+                Err(e) => {
+                    log::error!("Input error: {}", e);
                     break;
                 }
+                _ => {}
             }
         }
     });

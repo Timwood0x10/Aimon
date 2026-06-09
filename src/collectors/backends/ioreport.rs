@@ -273,8 +273,8 @@ impl IoReportSampler {
                 let mut_dict = CFDictionaryCreateMutable(
                     K_CF_ALLOCATOR_DEFAULT,
                     count,
-                    &kCFTypeDictionaryKeyCallBacks as *const _ as *const std::ffi::c_void,
-                    &kCFTypeDictionaryValueCallBacks as *const _ as *const std::ffi::c_void,
+                    &kCFTypeDictionaryKeyCallBacks as *const _,
+                    &kCFTypeDictionaryValueCallBacks as *const _,
                 );
                 if mut_dict.is_null() {
                     cf_release(channels);

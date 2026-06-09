@@ -7,8 +7,9 @@ use std::path::Path;
 use crate::ui::layouts::LayoutType;
 
 /// Process sorting options
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum ProcessSortBy {
+    #[default]
     #[serde(rename = "cpu")]
     Cpu,
     #[serde(rename = "memory")]
@@ -17,12 +18,6 @@ pub enum ProcessSortBy {
     Pid,
     #[serde(rename = "name")]
     Name,
-}
-
-impl Default for ProcessSortBy {
-    fn default() -> Self {
-        Self::Cpu
-    }
 }
 
 /// Default language setting

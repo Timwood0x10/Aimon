@@ -34,7 +34,7 @@ impl SysinfoCollector {
     /// Refresh CPU-specific data (usage + frequency)
     pub fn refresh_cpu(&mut self) {
         self.system
-            .refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage().with_frequency());
+            .refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage().with_frequency());
     }
 
     /// Refresh memory info
@@ -44,30 +44,23 @@ impl SysinfoCollector {
 
     /// Refresh process table with CPU, memory and disk usage
     pub fn refresh_processes(&mut self) {
-        self.system.refresh_processes_specifics(
-            ProcessRefreshKind::new()
-                .with_cpu()
-                .with_memory()
-                .with_disk_usage(),
-        );
+        use sysinfo::ProcessesToUpdate;
+        let kind = ProcessRefreshKind::nothing()
+            .with_cpu()
+            .with_memory()
+            .with_disk_usage();
+        self.system
+            .refresh_processes_specifics(ProcessesToUpdate::All, false, kind);
     }
 
     /// Refresh network interfaces
     pub fn refresh_networks(&mut self) {
-        if self.networks.is_empty() {
-            self.networks.refresh_list();
-        } else {
-            self.networks.refresh();
-        }
+        self.networks.refresh(false);
     }
 
     /// Refresh temperature components
     pub fn refresh_temperatures(&mut self) {
-        if self.components.list().is_empty() {
-            self.components.refresh_list();
-        } else {
-            self.components.refresh();
-        }
+        self.components.refresh(false);
     }
 
     /// Refresh all real-time data in one call

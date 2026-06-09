@@ -253,8 +253,8 @@ pub fn read_iohid_temperatures() -> Vec<IohidTemperatureReading> {
             keys.as_ptr(),
             vals.as_ptr(),
             2,
-            &kCFTypeDictionaryKeyCallBacks as *const _ as *const std::ffi::c_void,
-            &kCFTypeDictionaryValueCallBacks as *const _ as *const std::ffi::c_void,
+            &kCFTypeDictionaryKeyCallBacks as *const _,
+            &kCFTypeDictionaryValueCallBacks as *const _,
         );
         cf_release(page_key);
         cf_release(usage_key);

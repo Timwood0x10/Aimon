@@ -216,27 +216,19 @@ impl DataCollector {
     }
 
     fn refresh_realtime_data(&mut self) {
+        use sysinfo::ProcessesToUpdate;
         self.system
-            .refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage().with_frequency());
+            .refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage().with_frequency());
         self.system.refresh_memory();
-        self.system.refresh_processes_specifics(
-            ProcessRefreshKind::new()
-                .with_cpu()
-                .with_memory()
-                .with_disk_usage(),
-        );
+        let kind = ProcessRefreshKind::nothing()
+            .with_cpu()
+            .with_memory()
+            .with_disk_usage();
+        self.system
+            .refresh_processes_specifics(ProcessesToUpdate::All, false, kind);
 
-        if self.networks.is_empty() {
-            self.networks.refresh_list();
-        } else {
-            self.networks.refresh();
-        }
-
-        if self.components.list().is_empty() {
-            self.components.refresh_list();
-        } else {
-            self.components.refresh();
-        }
+        self.networks.refresh(false);
+        self.components.refresh(false);
     }
 
     fn collect_system_info(&mut self) -> SystemInfo {
@@ -265,7 +257,7 @@ impl DataCollector {
             kernel_version: System::kernel_version().unwrap_or_else(|| "Unknown".to_string()),
             os_version: System::os_version().unwrap_or_else(|| "Unknown".to_string()),
             host_name: System::host_name().unwrap_or_else(|| "Unknown".to_string()),
-            cpu_arch: System::cpu_arch().unwrap_or_else(|| "Unknown".to_string()),
+            cpu_arch: { let a = System::cpu_arch(); if a.is_empty() { "Unknown".to_string() } else { a } },
             cpu_brand: cpu_brand.clone(),
             cpu_core_count: total_cores,
             e_core_count,

@@ -16,7 +16,7 @@ use crate::history::HistoryData;
 use crate::types::*;
 use crate::ui::layouts::LayoutType;
 use ratatui::{
-    backend::TermionBackend,
+    backend::CrosstermBackend,
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -28,14 +28,13 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::process::Command;
 use sysinfo::{Disks, System};
-use termion::raw::IntoRawMode;
 
 use self::party_mode::PartyMode;
 use self::theme::Theme;
 
 /// Main UI structure
 pub struct UI {
-    terminal: Terminal<TermionBackend<termion::raw::RawTerminal<std::io::Stderr>>>,
+    terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
     theme: Theme,
     party_state: PartyMode,
     /// Currently active layout
@@ -54,8 +53,8 @@ impl UI {
     }
 
     pub fn with_theme(theme_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let stderr = io::stderr().into_raw_mode()?;
-        let backend = TermionBackend::new(stderr);
+        crossterm::terminal::enable_raw_mode()?;
+        let backend = CrosstermBackend::new(io::stdout());
         let terminal = Terminal::new(backend)?;
 
         let theme = Theme::from_name(theme_name).unwrap_or_else(|| {
@@ -117,7 +116,7 @@ impl UI {
     }
 
     fn render_startup_page(f: &mut Frame, theme: &Theme) {
-        let size = f.size();
+        let size = f.area();
         Self::fill_background(f, size, theme.bg);
 
         let summary = StartupSummary::collect();
@@ -158,7 +157,7 @@ impl UI {
 
         self.terminal.draw(|f| {
             // Fill background first to prevent terminal transparency
-            Self::fill_background(f, f.size(), theme.bg);
+            Self::fill_background(f, f.area(), theme.bg);
 
             // Draw the current layout
             match current_layout {
@@ -311,6 +310,7 @@ impl UI {
     pub fn cleanup(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.terminal.clear()?;
         self.terminal.show_cursor()?;
+        crossterm::terminal::disable_raw_mode()?;
         Ok(())
     }
 
@@ -365,7 +365,7 @@ impl StartupSummary {
             kernel_version: System::kernel_version().unwrap_or_else(|| "Unknown".to_string()),
             model_identifier: read_sysctl_value("hw.model")
                 .unwrap_or_else(|| "Unknown".to_string()),
-            cpu_arch: System::cpu_arch().unwrap_or_else(|| "Unknown".to_string()),
+            cpu_arch: { let a = System::cpu_arch(); if a.is_empty() { "Unknown".to_string() } else { a } },
             cpu_brand,
             cpu_cores: system.cpus().len(),
             memory_gb: system.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0,

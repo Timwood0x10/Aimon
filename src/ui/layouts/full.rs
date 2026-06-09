@@ -5,7 +5,7 @@ use crate::carbon::render::render_efficiency_advisor;
 use crate::config::Config;
 use crate::history::HistoryData;
 use crate::types::SystemData;
-use crate::ui::components;
+use crate::ui::{chart, components};
 use crate::ui::layout;
 use crate::ui::theme::Theme;
 use ratatui::Frame;
@@ -18,7 +18,7 @@ pub fn draw(
     config: &Config,
     theme: &Theme,
 ) {
-    let main = layout::create_full_layout(f.size());
+    let main = layout::create_full_layout(f.area());
 
     // Header with system info
     components::render_header(f, main[0], data, theme);
@@ -48,11 +48,50 @@ pub fn draw(
     // Middle section: Charts + CPU Cores
     let mid = layout::create_charts_layout(main[2]);
 
-    // Left side: CPU history chart
-    let chart_config = super::super::chart::ChartConfig::new("CPU HISTORY", 0.0, 100.0, theme.fg)
+    // Left side: CPU + Memory overlay chart (multi-dataset, ratatui v0.30.1 area fill)
+    {
+        let cpu_points: Vec<(f64, f64)> = history
+            .cpu_history
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64, v.into()))
+            .collect();
+        let mem_points: Vec<(f64, f64)> = history
+            .memory_history
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64, v.into()))
+            .collect();
+
+        let datasets = vec![
+            chart::DatasetEntry {
+                name: format!("CPU {:.1}%", data.cpu_info.average_usage),
+                data: cpu_points,
+                color: theme.cpu_color,
+                marker: Some(chart::ChartMarker::Braille),
+                area_baseline: Some(0.0),
+            },
+            chart::DatasetEntry {
+                name: format!("MEM {:.1}%", data.memory_info.usage_percentage),
+                data: mem_points,
+                color: theme.mem_color,
+                marker: Some(chart::ChartMarker::Dot),
+                area_baseline: Some(0.0),
+            },
+        ];
+
+        let overlay_config = super::super::chart::ChartConfig::new(
+            "CPU + MEMORY OVERLAY",
+            0.0,
+            100.0,
+            theme.fg,
+        )
         .with_bg(theme.bg)
-        .with_border_color(theme.border_color);
-    super::super::chart::render_chart(f, mid[0], &history.cpu_history, &chart_config);
+        .with_border_color(theme.border_color)
+        .with_shadow(super::super::chart::ChartShadow::DarkShade);
+
+        super::super::chart::render_multi_dataset_chart(f, mid[0], &datasets, &overlay_config);
+    }
 
     // Right side: CPU cores bar chart
     components::render_cpu_cores_bar_chart(f, mid[1], data, theme);

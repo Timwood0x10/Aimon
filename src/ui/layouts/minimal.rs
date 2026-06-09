@@ -10,7 +10,7 @@ use ratatui::Frame;
 
 /// Draw the minimal layout with only CPU and memory
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = layout::create_minimal_layout(f.size());
+    let areas = layout::create_minimal_layout(f.area());
 
     components::render_utilization_history_chart(
         f,

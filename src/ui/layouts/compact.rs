@@ -47,7 +47,7 @@ fn create_compact_grid(area: Rect) -> Vec<Rect> {
 
 /// Draw the compact layout with key metrics in a grid
 pub fn draw(f: &mut Frame, data: &SystemData, history: &HistoryData, theme: &Theme) {
-    let areas = create_compact_grid(f.size());
+    let areas = create_compact_grid(f.area());
 
     // Top row: CPU history, Memory history, Battery %
     components::render_utilization_history_chart(

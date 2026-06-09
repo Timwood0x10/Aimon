@@ -7,8 +7,10 @@ use crate::types::*;
 
 /// Collect thermal information from the system
 pub async fn collect_thermal_info(fan_control: &FanControlConfig) -> ThermalInfo {
-    let mut thermal_info = ThermalInfo::default();
-    thermal_info.fan_control_status = fan_control_status(fan_control);
+    let mut thermal_info = ThermalInfo {
+        fan_control_status: fan_control_status(fan_control),
+        ..Default::default()
+    };
 
     // ── Thermal State (via Foundation/NSProcessInfo) ────────────────
     // Try the public Apple API first; falls back gracefully.

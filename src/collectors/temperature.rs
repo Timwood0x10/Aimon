@@ -49,7 +49,7 @@ pub fn collect_temperature_info(components: &Components) -> Vec<TemperatureInfo>
         .iter()
         .map(|component| TemperatureInfo {
             label: component.label().to_string(),
-            temperature: component.temperature(),
+            temperature: component.temperature().unwrap_or(0.0),
             critical_temperature: component.critical().unwrap_or(100.0),
         })
         .collect()

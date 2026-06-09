@@ -2,10 +2,10 @@
 //! Contains reusable widgets and rendering functions
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Offset, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Gauge, Paragraph},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph, Shadow},
     Frame,
 };
 
@@ -68,9 +68,10 @@ fn panel_block(title: &str, _color: Color, theme: &Theme) -> Block<'static> {
     Block::default()
         .title(format!(" {title} "))
         .borders(Borders::ALL)
-        .border_type(ratatui::widgets::BorderType::Plain)
+        .border_type(ratatui::widgets::BorderType::Rounded)
         .border_style(Style::default().fg(theme.border_color))
         .style(Style::default().bg(theme.bg).fg(theme.fg))
+        .shadow(Shadow::medium_shade().offset(Offset::new(1, 1)))
 }
 
 /// Render header with system info
@@ -144,15 +145,23 @@ pub fn render_header(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme
     f.render_widget(header, area);
 }
 
-/// Render a CPU usage gauge with gradient bar
-pub fn render_cpu_gauge(f: &mut Frame, area: Rect, usage: f32, theme: &Theme) {
-    let color = if usage > 90.0 {
-        theme.critical_color
-    } else if usage > 70.0 {
-        theme.warning_color
+/// Smooth gradient color for gauges based on usage ratio
+fn gauge_gradient(ratio: f32, low: Color, mid: Color, high: Color) -> Color {
+    let ratio = ratio.clamp(0.0, 1.0);
+    if ratio < 0.5 {
+        let t = ratio * 2.0;
+        let t = t * t; // ease-in for slower transition at low usage
+        super::theme::lerp_color(low, mid, t)
     } else {
-        theme.cpu_color
-    };
+        let t = (ratio - 0.5) * 2.0;
+        let t = t * t; // ease-in for slower transition at mid usage
+        super::theme::lerp_color(mid, high, t)
+    }
+}
+
+/// Render a CPU usage gauge with smooth gradient bar
+pub fn render_cpu_gauge(f: &mut Frame, area: Rect, usage: f32, theme: &Theme) {
+    let color = gauge_gradient(usage / 100.0, theme.cpu_color, theme.warning_color, theme.critical_color);
 
     let gauge = Gauge::default()
         .block(panel_block(&format!("CPU {:.1}%", usage), color, theme))
@@ -174,15 +183,9 @@ pub fn render_cpu_gauge(f: &mut Frame, area: Rect, usage: f32, theme: &Theme) {
     f.render_widget(gauge, area);
 }
 
-/// Render a memory usage gauge with gradient bar
+/// Render a memory usage gauge with smooth gradient bar
 pub fn render_mem_gauge(f: &mut Frame, area: Rect, usage: u16, theme: &Theme) {
-    let color = if usage > 90 {
-        theme.critical_color
-    } else if usage > 70 {
-        theme.warning_color
-    } else {
-        theme.mem_color
-    };
+    let color = gauge_gradient(usage as f32 / 100.0, theme.mem_color, theme.warning_color, theme.critical_color);
 
     let gauge = Gauge::default()
         .block(panel_block(&format!("MEMORY {}%", usage), color, theme))
@@ -219,7 +222,10 @@ pub fn render_utilization_history_chart<T: Into<f64> + Copy>(
         theme.fg,
     )
     .with_bg(theme.bg)
-    .with_border_color(theme.border_color);
+    .with_border_color(theme.border_color)
+    .with_marker(chart::ChartMarker::Braille)
+    .with_shadow(chart::ChartShadow::MediumShade)
+    .as_area(0.0);
 
     chart::render_chart(f, area, data, &config);
 }
@@ -238,7 +244,10 @@ pub fn render_battery_level_chart(
         theme.fg,
     )
     .with_bg(theme.bg)
-    .with_border_color(theme.border_color);
+    .with_border_color(theme.border_color)
+    .with_marker(chart::ChartMarker::Dot)
+    .with_shadow(chart::ChartShadow::LightShade)
+    .as_area(0.0);
 
     chart::render_chart(f, area, data, &config);
 }
@@ -774,7 +783,7 @@ pub fn render_help_overlay(f: &mut Frame, theme: &Theme) {
     use ratatui::layout::{Constraint, Direction, Layout};
 
     // Create a centered area for the help popup
-    let area = f.size();
+    let area = f.area();
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -1206,13 +1215,7 @@ pub fn render_disk_io(f: &mut Frame, area: Rect, data: &SystemData, theme: &Them
 /// Render GPU usage gauge with frequency and TFLOPs
 pub fn render_gpu_gauge(f: &mut Frame, area: Rect, data: &SystemData, theme: &Theme) {
     let gpu = &data.gpu_info;
-    let color = if gpu.usage_percentage > 90.0 {
-        theme.critical_color
-    } else if gpu.usage_percentage > 70.0 {
-        theme.warning_color
-    } else {
-        theme.cpu_color
-    };
+    let color = gauge_gradient(gpu.usage_percentage / 100.0, theme.cpu_color, theme.warning_color, theme.critical_color);
 
     let label = if gpu.freq_mhz > 0 {
         format!("{:.1}% @ {}MHz", gpu.usage_percentage, gpu.freq_mhz)
@@ -1714,7 +1717,7 @@ pub fn render_system_details(f: &mut Frame, area: Rect, data: &SystemData, theme
 }
 
 pub fn render_session_report_overlay(f: &mut Frame, data: &SystemData, theme: &Theme) {
-    let area = centered_rect(62, 62, f.size());
+    let area = centered_rect(62, 62, f.area());
     f.render_widget(Clear, area);
 
     let tracker = &data.carbon_info;

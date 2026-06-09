@@ -269,18 +269,13 @@ pub struct FanInfo {
 }
 
 /// Thermal state as reported by macOS
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub enum ThermalState {
+    #[default]
     Nominal,
     Fair,
     Serious,
     Critical,
-}
-
-impl Default for ThermalState {
-    fn default() -> Self {
-        Self::Nominal
-    }
 }
 
 impl std::fmt::Display for ThermalState {
